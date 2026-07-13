@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model MriReport {
+  id          String   @id @default(cuid())
+  
+  // Patient Information
+  patientName     String
+  patientId       String?
+  patientAge      Int?
+  patientGender   String?   // Male, Female, Other
+  referringDoctor String?
+  studyDate       DateTime?
+  accessionNumber String?   @unique
+  
+  // Study Details
+  bodyRegion      String    // Brain, Spine-Cervical, Spine-Lumbar, Knee, Shoulder, Hip, Abdomen, Pelvis, Chest, Other
+  studyType       String    // T1, T2, FLAIR, STIR, DWI, T1-Contrast, MRA, etc.
+  modality        String    @default("MRI")
+  scannerModel    String?
+  fieldStrength   String?   // 1.5T, 3T, etc.
+  
+  // Clinical Information
+  clinicalIndication String?
+  clinicalHistory    String?
+  
+  // Report Content
+  technique      String?
+  comparison     String?
+  findings       String    // Main findings text
+  impression     String    // Clinical impression/conclusion
+  
+  // Additional Details
+  contrastAdministered Boolean  @default(false)
+  contrastAgent       String?
+  contrastVolume      String?
+  contrastRoute       String?
+  
+  // Metadata
+  reportStatus  String   @default("Draft")  // Draft, Final, Amended, Cancelled
+  priority      String   @default("Routine") // Routine, Urgent, STAT
+  reportNumber  String?
+  
+  // File attachment
+  attachmentPath String?
+  attachmentName String?
+  fileSize       Int?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Index for searching
+  @@index([patientName])
+  @@index([bodyRegion])
+  @@index([studyDate])
+  @@index([reportStatus])
+  @@index([accessionNumber])
+}
+
+// Report template for predefined formats
+model ReportTemplate {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Brain MRI with Contrast", "Lumbar Spine MRI"
+  bodyRegion  String
+  description String?
+  technique   String?   // Default technique text
+  findings    String?   // Template findings structure
+  impression  String?   // Template impression structure
+  isDefault   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
