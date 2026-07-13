@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   Database,
   Settings,
+  Download,
 } from 'lucide-react';
 
 export default function Home() {
@@ -99,7 +100,13 @@ export default function Home() {
       <footer className="border-t mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between text-xs text-muted-foreground">
           <span>MRI Report Manager — Synology NAS Ready</span>
-          <span>Docker Deployable</span>
+          <a
+            href="/api/download"
+            download="mri-reports.tar.gz"
+            className="flex items-center gap-1.5 text-xs font-medium text-primary hover:underline cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" /> Download Project
+          </a>
         </div>
       </footer>
     </div>
