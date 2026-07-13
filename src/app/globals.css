@@ -120,3 +120,305 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ===== PREMIUM RADIOLOGY REPORT STYLES ===== */
+.report-page {
+  max-width: 210mm;
+  margin: 0 auto;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08);
+  border-radius: 2px;
+  overflow: hidden;
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  color: #1a1a1a;
+  font-size: 11pt;
+  line-height: 1.5;
+}
+
+/* Header */
+.report-header {
+  padding: 16px 28px;
+}
+.report-header-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.report-header-contact {
+  max-width: 220px;
+}
+
+/* Study Title */
+.report-study-title {
+  padding: 10px 28px 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 2px solid #e5e7eb;
+}
+.report-modality-badge {
+  color: white;
+  font-size: 9pt;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 3px;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+}
+.report-title-text {
+  font-size: 13pt;
+  font-weight: 700;
+  color: #111;
+  letter-spacing: 0.3px;
+}
+.report-contrast-badge {
+  font-size: 8pt;
+  font-weight: 600;
+  color: #dc2626;
+  border: 1px solid #dc2626;
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
+/* Patient Info Box */
+.report-patient-box {
+  margin: 10px 28px;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 3px;
+  background: #fafbfc;
+}
+.report-patient-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px 16px;
+}
+.report-patient-field {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.report-patient-field.col-span-full {
+  grid-column: 1 / -1;
+}
+.report-patient-label {
+  font-size: 8pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6b7280;
+}
+.report-patient-value {
+  font-size: 10pt;
+  color: #111;
+}
+
+/* Sections */
+.report-section {
+  margin: 10px 28px 6px;
+}
+.report-section-heading {
+  font-size: 10pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #374151;
+  margin-bottom: 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.report-body-text {
+  font-size: 10pt;
+  color: #374151;
+  line-height: 1.6;
+}
+
+/* Findings */
+.report-findings-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.report-finding-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
+  line-height: 1.55;
+}
+.report-bullet {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+.report-finding-text {
+  font-size: 10pt;
+  color: #1f2937;
+}
+
+/* Impression */
+.report-impression-box {
+  margin: 14px 28px 10px;
+  padding: 12px 16px;
+  border-left: 4px solid #1e3a5f;
+  background: #f0f4f8;
+  border-radius: 0 3px 3px 0;
+}
+.report-impression-heading {
+  font-size: 10pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #1e3a5f;
+  margin-bottom: 8px;
+}
+.report-impression-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: impression;
+}
+.report-impression-item {
+  counter-increment: impression;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 3px;
+  font-size: 10pt;
+  font-weight: 600;
+  color: #1a1a1a;
+  line-height: 1.5;
+}
+.report-impression-item::before {
+  content: counter(impression) ".";
+  font-weight: 700;
+  color: #1e3a5f;
+  min-width: 16px;
+}
+
+/* Footer */
+.report-footer {
+  margin-top: auto;
+  padding-top: 8px;
+}
+.report-footer-bar {
+  height: 4px;
+}
+.report-footer-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 12px 28px 4px;
+}
+.report-signature-area {
+  display: flex;
+  gap: 24px;
+}
+.report-signature-block {
+  text-align: center;
+  min-width: 140px;
+}
+.report-signature-line {
+  width: 100%;
+  height: 1px;
+  background: #9ca3af;
+  margin-bottom: 4px;
+}
+.report-signature-name {
+  font-size: 10pt;
+  font-weight: 700;
+  color: #111;
+}
+.report-signature-qual {
+  font-size: 8pt;
+  color: #6b7280;
+}
+.report-signature-reg {
+  font-size: 7pt;
+  color: #9ca3af;
+  font-family: 'Courier New', monospace;
+}
+.report-footer-meta {
+  text-align: right;
+}
+.report-accreditation {
+  font-size: 7pt;
+  color: #6b7280;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.report-timestamp {
+  font-size: 7pt;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+.report-number {
+  font-size: 7pt;
+  color: #9ca3af;
+  font-family: 'Courier New', monospace;
+}
+.report-thank-you {
+  text-align: center;
+  font-size: 7pt;
+  font-weight: 600;
+  letter-spacing: 2px;
+  padding: 6px 0 12px;
+}
+
+/* ===== PRINT STYLES — A4 exact match ===== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+  html, body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .report-page {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 10pt !important;
+    line-height: 1.45 !important;
+  }
+  .report-header {
+    padding: 12px 20px !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .report-patient-box {
+    margin: 8px 20px !important;
+    padding: 8px 12px !important;
+  }
+  .report-section {
+    margin: 8px 20px 4px !important;
+  }
+  .report-impression-box {
+    margin: 10px 20px 8px !important;
+    padding: 10px 14px !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .report-footer-content {
+    padding: 10px 20px 4px !important;
+  }
+  /* Prevent page breaks inside sections */
+  .report-section, .report-impression-box, .report-patient-box {
+    break-inside: avoid;
+  }
+  /* Prevent impression from being stranded */
+  .report-impression-box {
+    break-before: auto;
+  }
+}

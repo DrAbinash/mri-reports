@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type TabValue = 'upload' | 'reports' | 'create' | 'dashboard';
+export type TabValue = 'upload' | 'reports' | 'create' | 'dashboard' | 'settings';
 
 export interface MriReport {
   id: string;

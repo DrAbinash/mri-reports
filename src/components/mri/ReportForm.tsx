@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAppStore, type TemplateData } from '@/lib/store';
+import FindingCheckboxes from './FindingCheckboxes';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -149,6 +150,21 @@ export default function ReportForm({ editId, onComplete, onCancel, templates }: 
       setLoading(false);
     }
   };
+
+  const handleFindingSelection = useCallback((selected: { text: string; isAbnormal: boolean }[]) => {
+    if (selected.length === 0) return;
+    const currentFindings = formData.findings
+      .split('\n').filter(l => l.trim()).join('\n');
+    // Append new selections that aren't already in findings
+    const existing = new Set(currentFindings.toLowerCase());
+    const newTexts = selected
+      .filter(s => !existing.has(s.text.toLowerCase()))
+      .map(s => s.text);
+    if (newTexts.length > 0) {
+      const separator = currentFindings ? '\n' : '';
+      handleChange('findings', currentFindings + separator + newTexts.join('\n'));
+    }
+  }, [formData.findings, handleChange]);
 
   const studyTypes = formData.bodyRegion && templates?.studyTypes
     ? templates.studyTypes[formData.bodyRegion] || templates.studyTypes['Other'] || ['Standard']
@@ -357,6 +373,10 @@ export default function ReportForm({ editId, onComplete, onCancel, templates }: 
                 <CardTitle className="text-sm">Report Content</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <FindingCheckboxes
+                  bodyRegion={formData.bodyRegion}
+                  onSelectionChange={handleFindingSelection}
+                />
                 <div className="space-y-1.5">
                   <Label>Technique</Label>
                   <Textarea value={formData.technique} onChange={e => handleChange('technique', e.target.value)} placeholder="Describe the MRI technique, sequences used..." rows={3} />

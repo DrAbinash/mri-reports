@@ -1,33 +1,35 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import type { MriReport } from '@/lib/store';
+import type { FindingItem } from './FindingCheckboxes';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   ArrowLeft,
   Pencil,
   Trash2,
   Printer,
-  User,
-  Calendar,
-  FileText,
-  Activity,
-  Hash,
-  Stethoscope,
-  Pill,
-  Zap,
+  Download,
+  Settings,
+  X,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-const STATUS_COLORS: Record<string, string> = {
-  Draft: 'bg-amber-100 text-amber-800',
-  Final: 'bg-emerald-100 text-emerald-800',
-  Amended: 'bg-blue-100 text-blue-800',
-  Cancelled: 'bg-red-100 text-red-800',
-};
+interface HospitalInfo {
+  hospitalName: string;
+  tagline: string | null;
+  address: string | null;
+  phone: string | null;
+  website: string | null;
+  email: string | null;
+  radiologistName: string | null;
+  radiologistQualification: string | null;
+  radiologistRegNumber: string | null;
+  accreditation: string | null;
+  accreditationNumber: string | null;
+  footerMessage: string;
+  reportHeaderColor: string;
+}
 
 interface Props {
   report: MriReport;
@@ -37,338 +39,250 @@ interface Props {
 }
 
 export default function ReportViewer({ report, onBack, onEdit, onDelete }: Props) {
-  const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>MRI Report - ${report.patientName}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Times New Roman', serif; font-size: 11pt; padding: 40px; max-width: 800px; margin: 0 auto; color: #1a1a1a; }
-          .header { text-align: center; border-bottom: 3px double #333; padding-bottom: 16px; margin-bottom: 24px; }
-          .header h1 { font-size: 18pt; font-weight: bold; margin-bottom: 4px; }
-          .header .subtitle { font-size: 10pt; color: #666; }
-          .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-          .info-section { margin-bottom: 20px; }
-          .info-section h3 { font-size: 11pt; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-bottom: 10px; color: #444; }
-          .info-row { display: flex; margin-bottom: 4px; font-size: 10.5pt; }
-          .info-label { font-weight: bold; width: 160px; color: #555; }
-          .info-value { flex: 1; }
-          .content-section { margin-bottom: 20px; }
-          .content-section h3 { font-size: 11pt; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-bottom: 10px; color: #444; }
-          .content-section p { font-size: 10.5pt; line-height: 1.6; white-space: pre-wrap; }
-          .impression { background: #f8f8f8; border-left: 3px solid #333; padding: 12px 16px; margin-top: 8px; }
-          .footer { margin-top: 40px; border-top: 2px solid #333; padding-top: 12px; display: flex; justify-content: space-between; font-size: 9pt; color: #888; }
-          .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9pt; font-weight: bold; }
-          @media print { body { padding: 20px; } }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>MAGNETIC RESONANCE IMAGING REPORT</h1>
-          <div class="subtitle">${report.bodyRegion} — ${report.studyType}</div>
-        </div>
-        
-        <div class="two-col">
-          <div class="info-section">
-            <h3>Patient Information</h3>
-            <div class="info-row"><span class="info-label">Patient Name:</span><span class="info-value">${report.patientName}</span></div>
-            ${report.patientId ? `<div class="info-row"><span class="info-label">Patient ID:</span><span class="info-value">${report.patientId}</span></div>` : ''}
-            ${report.patientAge ? `<div class="info-row"><span class="info-label">Age:</span><span class="info-value">${report.patientAge} years</span></div>` : ''}
-            ${report.patientGender ? `<div class="info-row"><span class="info-label">Gender:</span><span class="info-value">${report.patientGender}</span></div>` : ''}
-          </div>
-          <div class="info-section">
-            <h3>Study Information</h3>
-            <div class="info-row"><span class="info-label">Study Date:</span><span class="info-value">${report.studyDate ? format(new Date(report.studyDate), 'MMMM d, yyyy') : 'N/A'}</span></div>
-            ${report.accessionNumber ? `<div class="info-row"><span class="info-label">Accession #:</span><span class="info-value">${report.accessionNumber}</span></div>` : ''}
-            ${report.reportNumber ? `<div class="info-row"><span class="info-label">Report #:</span><span class="info-value">${report.reportNumber}</span></div>` : ''}
-            <div class="info-row"><span class="info-label">Modality:</span><span class="info-value">${report.modality}</span></div>
-            <div class="info-row"><span class="info-label">Body Region:</span><span class="info-value">${report.bodyRegion}</span></div>
-            <div class="info-row"><span class="info-label">Study Type:</span><span class="info-value">${report.studyType}</span></div>
-            ${report.scannerModel ? `<div class="info-row"><span class="info-label">Scanner:</span><span class="info-value">${report.scannerModel}</span></div>` : ''}
-            ${report.fieldStrength ? `<div class="info-row"><span class="info-label">Field Strength:</span><span class="info-value">${report.fieldStrength}</span></div>` : ''}
-          </div>
-        </div>
-        
-        ${report.referringDoctor || report.clinicalIndication ? `
-        <div class="info-section">
-          <h3>Clinical Information</h3>
-          ${report.referringDoctor ? `<div class="info-row"><span class="info-label">Referring Physician:</span><span class="info-value">${report.referringDoctor}</span></div>` : ''}
-          ${report.clinicalIndication ? `<div class="info-row"><span class="info-label">Indication:</span><span class="info-value">${report.clinicalIndication}</span></div>` : ''}
-          ${report.clinicalHistory ? `<div class="info-row"><span class="info-label">History:</span><span class="info-value">${report.clinicalHistory}</span></div>` : ''}
-        </div>
-        ` : ''}
-        
-        ${report.contrastAdministered ? `
-        <div class="info-section">
-          <h3>Contrast Administration</h3>
-          <div class="info-row"><span class="info-label">Agent:</span><span class="info-value">${report.contrastAgent || 'Not specified'}</span></div>
-          <div class="info-row"><span class="info-label">Volume:</span><span class="info-value">${report.contrastVolume || 'Not specified'}</span></div>
-          <div class="info-row"><span class="info-label">Route:</span><span class="info-value">${report.contrastRoute || 'IV'}</span></div>
-        </div>
-        ` : ''}
-        
-        <div class="content-section">
-          <h3>Technique</h3>
-          <p>${report.technique || 'Standard MRI protocol was performed.'}</p>
-        </div>
-        
-        ${report.comparison ? `
-        <div class="content-section">
-          <h3>Comparison</h3>
-          <p>${report.comparison}</p>
-        </div>
-        ` : ''}
-        
-        <div class="content-section">
-          <h3>Findings</h3>
-          <p>${report.findings}</p>
-        </div>
-        
-        <div class="content-section">
-          <h3>Impression</h3>
-          <div class="impression">
-            <p>${report.impression}</p>
-          </div>
-        </div>
-        
-        <div class="footer">
-          <div>Status: <span class="badge ${STATUS_COLORS[report.reportStatus] || ''}">${report.reportStatus}</span></div>
-          <div>Generated: ${format(new Date(report.createdAt), 'MMMM d, yyyy h:mm a')}</div>
-        </div>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
+  const [hospital, setHospital] = useState<HospitalInfo | null>(null);
+
+  useEffect(() => {
+    fetch('/api/reports/hospital-settings')
+      .then(r => r.json())
+      .then(d => setHospital(d.settings))
+      .catch(() => {});
+  }, []);
+
+  const handlePrint = () => window.print();
+
+  const handlePdf = () => {
+    handlePrint();
   };
 
+  const h = hospital || {
+    hospitalName: 'MRI Report Center',
+    tagline: null, address: null, phone: null, website: null, email: null,
+    radiologistName: null, radiologistQualification: null, radiologistRegNumber: null,
+    accreditation: null, accreditationNumber: null,
+    footerMessage: 'Thank you for choosing our services.',
+    reportHeaderColor: '#1e3a5f',
+  };
+
+  const headerColor = h.reportHeaderColor || '#1e3a5f';
+
+  // Parse findings into bullet points
+  const findingLines = report.findings
+    .split('\n')
+    .filter(l => l.trim())
+    .map(l => l.replace(/^[-•*]\s*/, '').trim());
+
+  const impressionLines = report.impression
+    .split('\n')
+    .filter(l => l.trim())
+    .map(l => l.replace(/^[-•*\d.)]+\s*/, '').trim());
+
   return (
-    <div className="space-y-4">
-      {/* Header Bar */}
-      <div className="flex items-center justify-between">
+    <>
+      {/* Screen-only toolbar */}
+      <div className="flex items-center gap-2 no-print mb-4 flex-wrap">
         <Button variant="ghost" onClick={onBack} className="gap-2">
-          <ArrowLeft className="w-4 h-4" />
-          Back to Reports
+          <ArrowLeft className="w-4 h-4" /> Back
         </Button>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handlePrint}>
-            <Printer className="w-4 h-4 mr-2" />
-            Print
-          </Button>
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            <Pencil className="w-4 h-4 mr-2" />
-            Edit
-          </Button>
-          <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={onDelete}>
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete
-          </Button>
-        </div>
+        <div className="flex-1" />
+        <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
+          <Printer className="w-4 h-4" /> Print
+        </Button>
+        <Button variant="outline" size="sm" onClick={handlePdf} className="gap-2">
+          <Download className="w-4 h-4" /> Download PDF
+        </Button>
+        <Button variant="outline" size="sm" onClick={onEdit} className="gap-2">
+          <Pencil className="w-4 h-4" /> Edit
+        </Button>
+        <Button variant="outline" size="sm" onClick={onDelete} className="gap-2 text-destructive hover:text-destructive">
+          <Trash2 className="w-4 h-4" /> Delete
+        </Button>
       </div>
 
-      <ScrollArea className="max-h-[calc(100vh-200px)]">
-        <Card className="max-w-4xl mx-auto">
-          {/* Report Header */}
-          <CardHeader className="text-center pb-2 border-b-2 border-double border-primary/30">
-            <CardTitle className="text-xl tracking-wide uppercase">
-              Magnetic Resonance Imaging Report
-            </CardTitle>
-            <div className="flex items-center justify-center gap-2 mt-1">
-              <Badge variant="secondary">{report.bodyRegion}</Badge>
-              <span className="text-muted-foreground">—</span>
-              <Badge variant="outline">{report.studyType}</Badge>
-              <Badge className={STATUS_COLORS[report.reportStatus] || ''}>{report.reportStatus}</Badge>
-              {report.priority !== 'Routine' && (
-                <Badge variant="destructive" className="text-[10px]">
-                  {report.priority === 'STAT' && <Zap className="w-3 h-3 mr-1" />}
-                  {report.priority}
-                </Badge>
+      {/* A4 Report Card */}
+      <div className="report-page" id="report-printable">
+        {/* === HEADER === */}
+        <div className="report-header" style={{ backgroundColor: headerColor }}>
+          <div className="report-header-inner">
+            <div className="flex items-center gap-3">
+              <div
+                className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl shrink-0"
+                style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}
+              >
+                {h.hospitalName.charAt(0)}
+              </div>
+              <div>
+                <h1 className="text-white font-bold text-xl tracking-wide leading-tight">
+                  {h.hospitalName.toUpperCase()}
+                </h1>
+                {h.tagline && (
+                  <p className="text-white/70 text-xs tracking-widest uppercase mt-0.5">{h.tagline}</p>
+                )}
+              </div>
+            </div>
+            <div className="report-header-contact text-right text-white/80 text-[10px] leading-relaxed">
+              {h.address && <div>{h.address}</div>}
+              {h.phone && <div>Tel: {h.phone}</div>}
+              {h.email && <div>{h.email}</div>}
+              {h.website && <div>{h.website}</div>}
+            </div>
+          </div>
+        </div>
+
+        {/* === STUDY TITLE === */}
+        <div className="report-study-title">
+          <span className="report-modality-badge" style={{ backgroundColor: headerColor }}>
+            {report.modality} {report.bodyRegion}
+          </span>
+          <h2 className="report-title-text">
+            {report.bodyRegion} — {report.studyType}
+          </h2>
+          {report.contrastAdministered && (
+            <span className="report-contrast-badge">+ Contrast</span>
+          )}
+        </div>
+
+        {/* === PATIENT INFO === */}
+        <div className="report-patient-box">
+          <div className="report-patient-grid">
+            <div className="report-patient-field">
+              <span className="report-patient-label">Patient Name</span>
+              <span className="report-patient-value font-semibold">{report.patientName}</span>
+            </div>
+            <div className="report-patient-field">
+              <span className="report-patient-label">Age / Gender</span>
+              <span className="report-patient-value">
+                {report.patientAge && `${report.patientAge} yrs`}
+                {report.patientAge && report.patientGender && ' / '}
+                {report.patientGender}
+              </span>
+            </div>
+            {report.patientId && (
+              <div className="report-patient-field">
+                <span className="report-patient-label">Patient ID</span>
+                <span className="report-patient-value font-mono text-xs">{report.patientId}</span>
+              </div>
+            )}
+            <div className="report-patient-field">
+              <span className="report-patient-label">Study Date</span>
+              <span className="report-patient-value">
+                {report.studyDate ? format(new Date(report.studyDate), 'dd MMM yyyy') : '—'}
+              </span>
+            </div>
+            {report.referringDoctor && (
+              <div className="report-patient-field">
+                <span className="report-patient-label">Referring Physician</span>
+                <span className="report-patient-value">{report.referringDoctor}</span>
+              </div>
+            )}
+            <div className="report-patient-field">
+              <span className="report-patient-label">Accession No.</span>
+              <span className="report-patient-value font-mono text-xs">{report.accessionNumber || '—'}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* === CLINICAL INFO (if any) === */}
+        {(report.clinicalIndication || report.clinicalHistory) && (
+          <div className="report-section">
+            <div className="report-patient-box">
+              <div className="report-patient-grid">
+                {report.clinicalIndication && (
+                  <div className="report-patient-field col-span-full">
+                    <span className="report-patient-label">Clinical Indication</span>
+                    <span className="report-patient-value">{report.clinicalIndication}</span>
+                  </div>
+                )}
+                {report.clinicalHistory && (
+                  <div className="report-patient-field col-span-full">
+                    <span className="report-patient-label">Clinical History</span>
+                    <span className="report-patient-value">{report.clinicalHistory}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* === TECHNIQUE === */}
+        {report.technique && (
+          <div className="report-section">
+            <h3 className="report-section-heading">Technique</h3>
+            <p className="report-body-text">{report.technique}</p>
+          </div>
+        )}
+
+        {/* === COMPARISON === */}
+        {report.comparison && (
+          <div className="report-section">
+            <h3 className="report-section-heading">Comparison</h3>
+            <p className="report-body-text">{report.comparison}</p>
+          </div>
+        )}
+
+        {/* === FINDINGS === */}
+        <div className="report-section">
+          <h3 className="report-section-heading">
+            MRI {report.bodyRegion.toUpperCase()} FINDINGS
+          </h3>
+          <ul className="report-findings-list">
+            {findingLines.map((line, i) => (
+              <li key={i} className="report-finding-item">
+                <span className="report-bullet" style={{ backgroundColor: headerColor }} />
+                <span className="report-finding-text">{line}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* === IMPRESSION === */}
+        <div className="report-impression-box" style={{ borderLeftColor: headerColor }}>
+          <h3 className="report-impression-heading">IMPRESSION</h3>
+          <ol className="report-impression-list">
+            {impressionLines.map((line, i) => (
+              <li key={i} className="report-impression-item">{line}</li>
+            ))}
+          </ol>
+        </div>
+
+        {/* === FOOTER === */}
+        <div className="report-footer">
+          <div className="report-footer-bar" style={{ backgroundColor: headerColor }} />
+
+          <div className="report-footer-content">
+            <div className="report-signature-area">
+              {h.radiologistName && (
+                <div className="report-signature-block">
+                  <div className="report-signature-line" />
+                  <p className="report-signature-name">{h.radiologistName}</p>
+                  {h.radiologistQualification && (
+                    <p className="report-signature-qual">{h.radiologistQualification}</p>
+                  )}
+                  {h.radiologistRegNumber && (
+                    <p className="report-signature-reg">Reg. No: {h.radiologistRegNumber}</p>
+                  )}
+                </div>
               )}
             </div>
-            {report.reportNumber && (
-              <p className="text-xs text-muted-foreground mt-1 font-mono">{report.reportNumber}</p>
-            )}
-          </CardHeader>
-
-          <CardContent className="pt-6 space-y-6">
-            {/* Two Column Info */}
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Patient Info */}
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-1.5 mb-3 flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5" /> Patient Information
-                </h3>
-                <dl className="space-y-2 text-sm">
-                  <div className="flex">
-                    <dt className="w-32 text-muted-foreground shrink-0">Name</dt>
-                    <dd className="font-medium">{report.patientName}</dd>
-                  </div>
-                  {report.patientId && (
-                    <div className="flex">
-                      <dt className="w-32 text-muted-foreground shrink-0">Patient ID</dt>
-                      <dd className="font-mono text-xs">{report.patientId}</dd>
-                    </div>
-                  )}
-                  {report.patientAge && (
-                    <div className="flex">
-                      <dt className="w-32 text-muted-foreground shrink-0">Age</dt>
-                      <dd>{report.patientAge} years</dd>
-                    </div>
-                  )}
-                  {report.patientGender && (
-                    <div className="flex">
-                      <dt className="w-32 text-muted-foreground shrink-0">Gender</dt>
-                      <dd>{report.patientGender}</dd>
-                    </div>
-                  )}
-                  {report.referringDoctor && (
-                    <div className="flex">
-                      <dt className="w-32 text-muted-foreground shrink-0">Referring Dr.</dt>
-                      <dd>{report.referringDoctor}</dd>
-                    </div>
-                  )}
-                </dl>
-              </div>
-
-              {/* Study Info */}
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-1.5 mb-3 flex items-center gap-1.5">
-                  <Activity className="w-3.5 h-3.5" /> Study Information
-                </h3>
-                <dl className="space-y-2 text-sm">
-                  <div className="flex">
-                    <dt className="w-32 text-muted-foreground shrink-0">Study Date</dt>
-                    <dd>{report.studyDate ? format(new Date(report.studyDate), 'MMMM d, yyyy') : 'N/A'}</dd>
-                  </div>
-                  {report.accessionNumber && (
-                    <div className="flex">
-                      <dt className="w-32 text-muted-foreground shrink-0">Accession #</dt>
-                      <dd className="font-mono text-xs">{report.accessionNumber}</dd>
-                    </div>
-                  )}
-                  <div className="flex">
-                    <dt className="w-32 text-muted-foreground shrink-0">Modality</dt>
-                    <dd>{report.modality}</dd>
-                  </div>
-                  <div className="flex">
-                    <dt className="w-32 text-muted-foreground shrink-0">Region / Type</dt>
-                    <dd>{report.bodyRegion} — {report.studyType}</dd>
-                  </div>
-                  {report.scannerModel && (
-                    <div className="flex">
-                      <dt className="w-32 text-muted-foreground shrink-0">Scanner</dt>
-                      <dd>{report.scannerModel}{report.fieldStrength ? ` (${report.fieldStrength})` : ''}</dd>
-                    </div>
-                  )}
-                </dl>
-              </div>
+            <div className="report-footer-meta">
+              {h.accreditation && (
+                <p className="report-accreditation">
+                  {h.accreditation}{h.accreditationNumber && ` — ${h.accreditationNumber}`}
+                </p>
+              )}
+              <p className="report-timestamp">
+                Report generated: {format(new Date(report.createdAt), 'dd MMM yyyy, hh:mm a')}
+              </p>
+              {report.reportNumber && (
+                <p className="report-number">Report No: {report.reportNumber}</p>
+              )}
             </div>
+          </div>
 
-            {/* Clinical Info */}
-            {(report.clinicalIndication || report.clinicalHistory) && (
-              <>
-                <Separator />
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-1.5 mb-3 flex items-center gap-1.5">
-                    <Stethoscope className="w-3.5 h-3.5" /> Clinical Information
-                  </h3>
-                  {report.clinicalIndication && (
-                    <div className="flex text-sm mb-1">
-                      <dt className="w-32 text-muted-foreground shrink-0">Indication</dt>
-                      <dd>{report.clinicalIndication}</dd>
-                    </div>
-                  )}
-                  {report.clinicalHistory && (
-                    <div className="flex text-sm">
-                      <dt className="w-32 text-muted-foreground shrink-0">History</dt>
-                      <dd>{report.clinicalHistory}</dd>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* Contrast */}
-            {report.contrastAdministered && (
-              <>
-                <Separator />
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-1.5 mb-3 flex items-center gap-1.5">
-                    <Pill className="w-3.5 h-3.5" /> Contrast Administration
-                  </h3>
-                  <div className="grid grid-cols-3 gap-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground text-xs">Agent</span>
-                      <p>{report.contrastAgent || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground text-xs">Volume</span>
-                      <p>{report.contrastVolume || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground text-xs">Route</span>
-                      <p>{report.contrastRoute || 'IV'}</p>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-            <Separator />
-
-            {/* Technique */}
-            {report.technique && (
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-1.5 mb-3 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5" /> Technique
-                </h3>
-                <p className="text-sm whitespace-pre-wrap leading-relaxed">{report.technique}</p>
-              </div>
-            )}
-
-            {/* Comparison */}
-            {report.comparison && (
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-1.5 mb-3 flex items-center gap-1.5">
-                  <Hash className="w-3.5 h-3.5" /> Comparison
-                </h3>
-                <p className="text-sm whitespace-pre-wrap leading-relaxed">{report.comparison}</p>
-              </div>
-            )}
-
-            {/* Findings */}
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-1.5 mb-3 flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5" /> Findings
-              </h3>
-              <div className="bg-muted/30 rounded-lg p-4 border">
-                <p className="text-sm whitespace-pre-wrap leading-relaxed">{report.findings}</p>
-              </div>
-            </div>
-
-            {/* Impression */}
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-1.5 mb-3 flex items-center gap-1.5">
-                <Activity className="w-3.5 h-3.5" /> Impression
-              </h3>
-              <div className="bg-primary/5 rounded-lg p-4 border-l-4 border-primary">
-                <p className="text-sm whitespace-pre-wrap leading-relaxed font-medium">{report.impression}</p>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <Separator />
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Created: {format(new Date(report.createdAt), 'MMMM d, yyyy h:mm a')}</span>
-              <span>Updated: {format(new Date(report.updatedAt), 'MMMM d, yyyy h:mm a')}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </ScrollArea>
-    </div>
+          <div className="report-thank-you" style={{ color: headerColor }}>
+            {h.footerMessage.toUpperCase()}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

@@ -5,6 +5,7 @@ import FolderUpload from '@/components/mri/FolderUpload';
 import ReportList from '@/components/mri/ReportList';
 import ReportForm from '@/components/mri/ReportForm';
 import Dashboard from '@/components/mri/Dashboard';
+import SettingsPage from '@/components/mri/SettingsPage';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useState, useEffect } from 'react';
 import type { TemplateData } from '@/lib/store';
@@ -14,6 +15,7 @@ import {
   FilePlus,
   LayoutDashboard,
   Database,
+  Settings,
 } from 'lucide-react';
 
 export default function Home() {
@@ -25,6 +27,8 @@ export default function Home() {
       .then(r => r.json())
       .then(setTemplates)
       .catch(console.error);
+    // Seed finding defaults on first load
+    fetch('/api/reports/seed-findings', { method: 'POST' }).catch(() => {});
   }, []);
 
   const handleTabChange = (value: string) => {
@@ -50,8 +54,7 @@ export default function Home() {
               <TabsList className="h-9">
                 <TabsTrigger value="upload" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
                   <Upload className="w-3.5 h-3.5 hidden sm:block" />
-                  <span className="sm:hidden">Upload</span>
-                  <span className="hidden sm:inline">Upload</span>
+                  <span>Upload</span>
                 </TabsTrigger>
                 <TabsTrigger value="reports" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
                   <FileText className="w-3.5 h-3.5 hidden sm:block" />
@@ -59,12 +62,16 @@ export default function Home() {
                 </TabsTrigger>
                 <TabsTrigger value="create" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
                   <FilePlus className="w-3.5 h-3.5 hidden sm:block" />
-                  <span className="sm:hidden">New</span>
                   <span className="hidden sm:inline">New Report</span>
+                  <span className="sm:hidden">New</span>
                 </TabsTrigger>
                 <TabsTrigger value="dashboard" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
                   <LayoutDashboard className="w-3.5 h-3.5 hidden sm:block" />
                   <span>Dashboard</span>
+                </TabsTrigger>
+                <TabsTrigger value="settings" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
+                  <Settings className="w-3.5 h-3.5 hidden sm:block" />
+                  <span>Settings</span>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -85,6 +92,7 @@ export default function Home() {
           />
         )}
         {activeTab === 'dashboard' && <Dashboard />}
+        {activeTab === 'settings' && <SettingsPage />}
       </main>
 
       {/* Sticky Footer */}

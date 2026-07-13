@@ -14,17 +14,17 @@ model MriReport {
   patientName     String
   patientId       String?
   patientAge      Int?
-  patientGender   String?   // Male, Female, Other
+  patientGender   String?
   referringDoctor String?
   studyDate       DateTime?
-  accessionNumber String?   // Removed @unique — bulk import may have blanks
+  accessionNumber String?
   
   // Study Details
-  bodyRegion      String    // Brain, Spine-Cervical, Spine-Lumbar, Knee, Shoulder, Hip, Abdomen, Pelvis, Chest, Other
-  studyType       String    // T1, T2, FLAIR, STIR, DWI, T1-Contrast, MRA, etc.
+  bodyRegion      String
+  studyType       String
   modality        String    @default("MRI")
   scannerModel    String?
-  fieldStrength   String?   // 1.5T, 3T, etc.
+  fieldStrength   String?
   
   // Clinical Information
   clinicalIndication String?
@@ -33,8 +33,8 @@ model MriReport {
   // Report Content
   technique      String?
   comparison     String?
-  findings       String    // Main findings text
-  impression     String    // Clinical impression/conclusion
+  findings       String
+  impression     String
   
   // Additional Details
   contrastAdministered Boolean  @default(false)
@@ -43,8 +43,8 @@ model MriReport {
   contrastRoute       String?
   
   // Metadata
-  reportStatus  String   @default("Draft")  // Draft, Final, Amended, Cancelled
-  priority      String   @default("Routine") // Routine, Urgent, STAT
+  reportStatus  String   @default("Draft")
+  priority      String   @default("Routine")
   reportNumber  String?
   
   // File attachment
@@ -56,7 +56,6 @@ model MriReport {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  // Index for searching
   @@index([patientName])
   @@index([bodyRegion])
   @@index([studyDate])
@@ -64,16 +63,51 @@ model MriReport {
   @@index([accessionNumber])
 }
 
-// Report template for predefined formats
 model ReportTemplate {
   id          String   @id @default(cuid())
-  name        String   // e.g., "Brain MRI with Contrast", "Lumbar Spine MRI"
+  name        String
   bodyRegion  String
   description String?
-  technique   String?   // Default technique text
-  findings    String?   // Template findings structure
-  impression  String?   // Template impression structure
+  technique   String?
+  findings    String?
+  impression  String?
   isDefault   Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+// Quick-select finding templates per body region
+model FindingTemplate {
+  id          String   @id @default(cuid())
+  bodyRegion  String
+  label       String   // e.g. "Senile changes", "Disc bulge"
+  text        String   // Full finding text, e.g. "Age-related cerebral atrophy noted"
+  isAbnormal  Boolean  @default(false) // Whether to bold/highlight
+  sortOrder   Int      @default(0)
+  isDefault   Boolean  @default(true)  // Pre-seeded defaults vs user-added
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([bodyRegion])
+}
+
+// Hospital/Diagnostic center settings
+model HospitalSettings {
+  id              String   @id @default(cuid())
+  hospitalName    String   @default("MRI Report Center")
+  tagline         String?
+  address         String?
+  phone           String?
+  website         String?
+  email           String?
+  logoUrl         String?
+  radiologistName String?
+  radiologistQualification String?
+  radiologistRegNumber String?
+  accreditation   String?
+  accreditationNumber  String?
+  footerMessage   String   @default("Thank you for choosing our services.")
+  reportHeaderColor String @default("#1e3a5f") // Navy blue
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
