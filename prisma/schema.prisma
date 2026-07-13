@@ -76,22 +76,20 @@ model ReportTemplate {
   updatedAt   DateTime  @updatedAt
 }
 
-// Quick-select finding templates per body region
 model FindingTemplate {
   id          String   @id @default(cuid())
   bodyRegion  String
-  label       String   // e.g. "Senile changes", "Disc bulge"
-  text        String   // Full finding text, e.g. "Age-related cerebral atrophy noted"
-  isAbnormal  Boolean  @default(false) // Whether to bold/highlight
+  label       String
+  text        String
+  isAbnormal  Boolean  @default(false)
   sortOrder   Int      @default(0)
-  isDefault   Boolean  @default(true)  // Pre-seeded defaults vs user-added
+  isDefault   Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   @@index([bodyRegion])
 }
 
-// Hospital/Diagnostic center settings
 model HospitalSettings {
   id              String   @id @default(cuid())
   hospitalName    String   @default("MRI Report Center")
@@ -107,7 +105,20 @@ model HospitalSettings {
   accreditation   String?
   accreditationNumber  String?
   footerMessage   String   @default("Thank you for choosing our services.")
-  reportHeaderColor String @default("#1e3a5f") // Navy blue
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  reportHeaderColor String @default("#1e3a5f")
+
+  // Print layout options
+  reportLayout    String   @default("classic")
+  showTechnique   Boolean  @default(true)
+  showComparison  Boolean  @default(true)
+  showClinicalInfo Boolean  @default(true)
+  showSignature   Boolean  @default(true)
+  showFooterMessage Boolean  @default(true)
+  showAccreditation Boolean  @default(true)
+  patientColumns  String   @default("3")
+  impressionStyle  String   @default("bordered")
+  headerStyle     String   @default("full")
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }

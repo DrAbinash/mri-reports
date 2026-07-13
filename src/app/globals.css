@@ -421,4 +421,55 @@
   .report-impression-box {
     break-before: auto;
   }
+
+  /* Modern layout: transparent impression */
+  .report-page[data-layout="modern"] .report-impression-box {
+    background: transparent !important;
+    border-left-color: currentColor !important;
+    padding: 4px 0 !important;
+    margin-left: 0 !important;
+  }
+  .report-page[data-layout="modern"] .report-impression-heading {
+    border-bottom: 2px solid currentColor !important;
+    padding-bottom: 2px !important;
+    margin-bottom: 4px !important;
+  }
+  .report-page[data-layout="modern"] .report-impression-item {
+    font-weight: 500 !important;
+    color: #1f2937 !important;
+  }
+
+  /* Compact layout: tighter spacing */
+  .report-page[data-layout="compact"] {
+    font-size: 9pt !important;
+    line-height: 1.4 !important;
+  }
+  .report-page[data-layout="compact"] .report-header {
+    padding: 8px 20px !important;
+  }
+  .report-page[data-layout="compact"] .report-patient-box {
+    margin: 6px 20px !important;
+    padding: 6px 12px !important;
+  }
+  .report-page[data-layout="compact"] .report-section {
+    margin: 6px 20px 3px !important;
+  }
+  .report-page[data-layout="compact"] .report-impression-box {
+    margin: 8px 20px 6px !important;
+    padding: 6px 12px !important;
+  }
+  .report-page[data-layout="compact"] .report-footer-content {
+    padding: 6px 20px 2px !important;
+  }
+  .report-page[data-layout="compact"] .report-thank-you {
+    padding: 4px 0 8px !important;
+    letter-spacing: 1.5px !important;
+  }
+  .report-page[data-layout="compact"] .report-impression-item::before {
+    font-weight: 700 !important;
+    color: #374151 !important;
+  }
+  .report-page[data-layout="compact"] .report-finding-text {
+    font-weight: 400 !important;
+  }
 }
