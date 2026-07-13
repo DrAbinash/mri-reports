@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+*.md
+.env
+.env.local
+db/
+uploads/
+mini-services/
+examples/
+.caddy
+Caddyfile
+*.log
+download/

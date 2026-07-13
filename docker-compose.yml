@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  mri-reports:
+    build: .
+    container_name: mri-report-manager
+    restart: unless-stopped
+    ports:
+      - "3080:3000"
+    volumes:
+      # Persistent database - survives container restarts
+      - ./data/db:/app/data/db
+      # Persistent uploaded MRI reports
+      - ./data/uploads:/app/data/uploads
+      # Mount your existing MRI report folder (read-only) for easy import
+      # - /path/to/your/mri_reports:/import:ro
+    environment:
+      - DATABASE_URL=file:/app/data/db/mri_reports.db
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
