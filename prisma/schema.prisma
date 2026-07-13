@@ -17,7 +17,7 @@ model MriReport {
   patientGender   String?   // Male, Female, Other
   referringDoctor String?
   studyDate       DateTime?
-  accessionNumber String?   @unique
+  accessionNumber String?   // Removed @unique — bulk import may have blanks
   
   // Study Details
   bodyRegion      String    // Brain, Spine-Cervical, Spine-Lumbar, Knee, Shoulder, Hip, Abdomen, Pelvis, Chest, Other

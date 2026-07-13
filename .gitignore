@@ -30,8 +30,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files — keep .env.example, ignore the rest
+.env
+.env.local
+.env.production
+!.env.example
 
 # vercel
 .vercel
@@ -50,5 +53,17 @@ test
 prompt
 
 server.log
+
+# Synology Docker data (created at runtime)
+/data/
+/uploads/
+
+# Tool results
+tool-results/
+
 # Skills directory
 /skills/
+
+# Dev database
+/db/*.db
+/db/*.db-journal

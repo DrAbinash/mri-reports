@@ -1,40 +1,53 @@
-FROM node:20-alpine AS base
+# ---- Build Stage ----
+FROM node:20-alpine AS builder
 
-# Install dependencies only when needed
-FROM base AS deps
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-COPY package.json bun.lock ./
-RUN npm install -g bun@latest && bun install --frozen-lockfile
+# Install dependencies with npm (reliable on Synology ARM/x86)
+COPY package.json package-lock.json* ./
+RUN npm install
 
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# Copy source and generate Prisma client
+COPY prisma ./prisma/
+RUN npx prisma generate
+
+# Copy rest of the app
 COPY . .
 
+# Build Next.js standalone
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN bun run db:generate
-RUN bun run build
+RUN npm run build
 
-# Production image
-FROM base AS runner
+# ---- Production Stage ----
+FROM node:20-alpine AS runner
+
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
+# Copy built output
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# Create data directories for uploads and database
-RUN mkdir -p /app/data/uploads/organized /app/data/db
-RUN chown -R nextjs:nodejs /app/data
+# Copy Prisma schema for runtime migrations
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+
+# Create data directories with proper ownership
+RUN mkdir -p /app/data/uploads/organized /app/data/db && \
+    chown -R nextjs:nodejs /app/data
+
+# Copy and set up entrypoint
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh && \
+    chown nextjs:nodejs /app/docker-entrypoint.sh
 
 USER nextjs
 
@@ -43,5 +56,7 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 ENV DATABASE_URL="file:/app/data/db/mri_reports.db"
+ENV UPLOAD_DIR="/app/data/uploads"
 
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["node", "server.js"]

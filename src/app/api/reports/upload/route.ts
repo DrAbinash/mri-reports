@@ -3,11 +3,20 @@ import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { db } from '@/lib/db';
-import { z } from 'zod';
 
-// Allow large file uploads up to 500MB
+// Allow large file uploads
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
+
+/** Resolve the upload base directory — works in both dev and Docker */
+function getUploadBase(): string {
+  // In production/Docker, use the env var or the data volume path
+  if (process.env.NODE_ENV === 'production') {
+    return process.env.UPLOAD_DIR || '/app/data/uploads';
+  }
+  // In dev, use the project's uploads/ folder
+  return path.join(process.cwd(), 'uploads');
+}
 
 // Auto-detect body region from filename/folder name
 function detectBodyRegion(filename: string, folderPath: string): string {
@@ -59,14 +68,10 @@ function detectBodyRegion(filename: string, folderPath: string): string {
 
 // Extract patient name from filename (common patterns)
 function extractPatientName(filename: string): string {
-  // Remove extension
   let name = filename.replace(/\.[^/.]+$/, '');
-  // Remove common prefixes/suffixes
   name = name.replace(/^(mri|mr|report|scan)_?/i, '');
   name = name.replace(/_(mri|mr|report|scan)$/i, '');
-  // Replace underscores and dashes with spaces
   name = name.replace(/[_-]+/g, ' ').trim();
-  // Title case
   if (name.length > 0) {
     name = name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
   }
@@ -105,18 +110,16 @@ function detectStudyType(filename: string): string {
   return 'Standard';
 }
 
-// Extract date from filename (common patterns: YYYYMMDD, YYYY-MM-DD, DD-MM-YYYY)
+// Extract date from filename (common patterns: YYYYMMDD, YYYY-MM-DD)
 function extractDate(filename: string): Date | null {
   const cleanName = filename.replace(/\.[^/.]+$/, '');
   
-  // YYYYMMDD
   let match = cleanName.match(/(\d{4})(\d{2})(\d{2})/);
   if (match) {
     const d = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
     if (d.getTime() > 0) return d;
   }
   
-  // YYYY-MM-DD
   match = cleanName.match(/(\d{4})-(\d{2})-(\d{2})/);
   if (match) {
     const d = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
@@ -136,10 +139,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No files provided' }, { status: 400 });
     }
 
-    // Ensure upload directories exist
-    const uploadBase = path.join(process.cwd(), 'uploads');
+    // Use the correct upload directory for both dev and Docker
+    const uploadBase = getUploadBase();
     const organizedBase = path.join(uploadBase, 'organized');
 
+    // Ensure directories exist
     for (const dir of [uploadBase, organizedBase]) {
       if (!existsSync(dir)) {
         await mkdir(dir, { recursive: true });
@@ -166,7 +170,7 @@ export async function POST(request: NextRequest) {
         const studyType = detectStudyType(originalName);
         const studyDate = extractDate(originalName);
 
-        // Organize into: uploads/organized/{BodyRegion}/{YYYY-MM}/{filename}
+        // Organize into: organized/{BodyRegion}/{YYYY-MM}/{filename}
         const now = studyDate || new Date();
         const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         const regionSlug = bodyRegion.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -179,7 +183,7 @@ export async function POST(request: NextRequest) {
         const storedPath = path.join(organizedDir, originalName);
         await writeFile(storedPath, buffer);
 
-        // Create database record
+        // Create database record (no unique constraint on accessionNumber anymore)
         const report = await db.mriReport.create({
           data: {
             patientName,
