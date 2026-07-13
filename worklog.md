@@ -49,3 +49,32 @@ Stage Summary:
 - Database tables auto-created on first container start via entrypoint
 - Upload files stored in correct Docker volume path
 - Production logs no longer flooded with SQL queries
+
+---
+Task ID: 3
+Agent: Main
+Task: Fix ReportViewer.tsx, implement PDF download, browser verification
+
+Work Log:
+- Found ReportViewer.tsx was missing (only .tmp/.bak files existed) — restored from .tmp backup
+- Fixed syntax error: double `}}` on line 384 (extra closing brace)
+- Fixed duplicate `const isCompact` (was already fixed in .tmp)
+- Implemented proper `handleDownloadPdf()` function that:
+  - Extracts report HTML from the DOM
+  - Extracts all report-related CSS rules from stylesheets
+  - Builds a standalone HTML document with inline styles
+  - Opens in a new window and auto-triggers browser print dialog
+  - User can select "Save as PDF" from the native print dialog
+- Changed "Download PDF" button to use `handleDownloadPdf` instead of `handlePrint`
+- Verified server compiles successfully (GET / returns 200)
+- Verified all API endpoints return 200: templates, stats, reports, hospital-settings, seed-findings
+- No compilation errors in dev log
+- Agent-browser cannot reach localhost due to sandboxing limitations (external sites work fine)
+- Server-side verification via curl confirms all endpoints functional
+
+Stage Summary:
+- ReportViewer.tsx restored and fixed — no more missing component crash
+- PDF download now opens standalone print window with all CSS embedded
+- Print button still uses `window.print()` for direct printing
+- All 5+ API endpoints verified returning 200
+- App compiles and serves successfully
