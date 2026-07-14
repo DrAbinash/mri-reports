@@ -26,10 +26,6 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Create non-root user
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
-
 # Copy built output
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
@@ -41,16 +37,15 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 
-# Create data directories with proper ownership
-RUN mkdir -p /app/data/uploads/organized /app/data/db && \
-    chown -R nextjs:nodejs /app/data /app/node_modules
+# Create data directories (runs as root — Synology volumes are root-owned)
+RUN mkdir -p /app/data/uploads/organized /app/data/db
 
 # Copy and set up entrypoint
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh && \
-    chown nextjs:nodejs /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 
-USER nextjs
+# NOTE: Running as root for Synology compatibility.
+# Synology Docker volumes mount as root — non-root users get Permission denied.
 
 EXPOSE 3000
 
