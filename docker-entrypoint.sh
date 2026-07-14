@@ -10,22 +10,51 @@ echo "========================================="
 # Ensure data directories exist
 mkdir -p /app/data/db /app/data/uploads/organized
 
-# Create/update database tables using raw SQL via sqlite3 CLI
-# This is 100% reliable — no Node.js module dependencies needed
+# Database setup using sqlite3 CLI
 DB_FILE="/app/data/db/mri_reports.db"
 SQL_FILE="/app/schema.sql"
 
-if [ -f "$SQL_FILE" ]; then
+setup_db() {
   echo "[entrypoint] Setting up database tables..."
-  if sqlite3 "$DB_FILE" < "$SQL_FILE" 2>&1; then
-    echo "[entrypoint] Database tables created/verified."
+  if [ -f "$SQL_FILE" ]; then
+    if sqlite3 "$DB_FILE" < "$SQL_FILE" 2>&1; then
+      echo "[entrypoint] Database tables created/verified."
+      return 0
+    else
+      echo "[entrypoint] WARNING: sqlite3 setup had issues."
+      return 1
+    fi
   else
-    echo "[entrypoint] WARNING: sqlite3 setup had issues, continuing anyway..."
-    [ -f "$DB_FILE" ] || touch "$DB_FILE"
+    echo "[entrypoint] WARNING: schema.sql not found!"
+    return 1
+  fi
+}
+
+# Check if DB exists and has required tables
+if [ -f "$DB_FILE" ]; then
+  echo "[entrypoint] Existing database found."
+
+  # Check for required tables
+  MISSING_TABLES=""
+  for TABLE in MriReport ReportTemplate FindingTemplate HospitalSettings; do
+    if ! sqlite3 "$DB_FILE" "SELECT name FROM sqlite_master WHERE type='table' AND name='$TABLE';" 2>/dev/null | grep -q "$TABLE"; then
+      MISSING_TABLES="$MISSING_TABLES $TABLE"
+    fi
+  done
+
+  if [ -n "$MISSING_TABLES" ]; then
+    echo "[entrypoint] MISSING TABLES:$MISSING_TABLES"
+    echo "[entrypoint] Recreating database from scratch..."
+    rm -f "$DB_FILE"
+    setup_db
+  else
+    echo "[entrypoint] All 4 tables found. Database looks good."
+    # Still run schema.sql to add any new columns (IF NOT EXISTS is safe)
+    setup_db
   fi
 else
-  echo "[entrypoint] WARNING: schema.sql not found — skipping DB setup"
-  [ -f "$DB_FILE" ] || touch "$DB_FILE"
+  echo "[entrypoint] No existing database. Creating new one..."
+  setup_db
 fi
 
 # Verify Prisma engine exists
@@ -33,10 +62,7 @@ ENGINE_FILE=$(find /app/node_modules/.prisma -name "libquery_engine*" -type f 2>
 if [ -n "$ENGINE_FILE" ]; then
   echo "[entrypoint] Prisma engine found: $(basename "$ENGINE_FILE")"
 else
-  echo "[entrypoint] WARNING: No Prisma engine binary found! DB queries will fail."
-  echo "[entrypoint] Engine search path: /app/node_modules/.prisma/"
-  ls -la /app/node_modules/.prisma/ 2>/dev/null || echo "[entrypoint] .prisma directory missing"
-  ls -la /app/node_modules/.prisma/client/ 2>/dev/null || echo "[entrypoint] .prisma/client directory missing"
+  echo "[entrypoint] WARNING: No Prisma engine binary found!"
 fi
 
 # Verify server.js exists
