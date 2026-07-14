@@ -51,8 +51,11 @@ dev.log
 dev.out.log
 test
 prompt
-
 server.log
+
+# Backup/temp files
+*.tmp
+*.bak
 
 # Synology Docker data (created at runtime)
 /data/

@@ -3,19 +3,23 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies with npm (reliable on Synology ARM/x86)
-COPY package.json package-lock.json* ./
-RUN npm install
+# Install dependencies — npm ci uses package-lock.json for exact versions
+# This is critical for Synology: ensures reproducible builds on any architecture
+COPY package.json package-lock.json ./
+RUN npm ci
 
-# Copy source and generate Prisma client
+# Copy Prisma schema and generate client BEFORE copying source
+# This ensures the correct engine binary for Alpine/musl is downloaded
 COPY prisma ./prisma/
 RUN npx prisma generate
 
-# Copy rest of the app
+# Copy source and build
 COPY . .
 
-# Build Next.js standalone
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
+# Build Next.js standalone output
 RUN npm run build
 
 # ---- Production Stage ----
@@ -26,19 +30,21 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install sqlite3 CLI for database creation (tiny, reliable, no deps)
+# Install sqlite3 CLI for runtime DB table creation
 RUN apk add --no-cache sqlite
 
-# Copy built output
-COPY --from=builder /app/public ./public
+# Copy built standalone output
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
 
-# Copy Prisma client (runtime queries) — NOT the CLI
+# Copy Prisma runtime files — engine binary + generated client
+# The engine binary is platform-specific and MUST match the target architecture
+# Since both stages use node:20-alpine, the binary is correct
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
-# Copy SQL schema for entrypoint
+# Copy SQL schema for entrypoint DB setup
 COPY schema.sql /app/schema.sql
 
 # Create data directories
