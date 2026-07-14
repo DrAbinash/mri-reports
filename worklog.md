@@ -159,4 +159,29 @@ Stage Summary:
 - Created `/src/lib/normalAnatomy.ts` — comprehensive MRI normal anatomy template library
 - 14 body regions, 98 selectable anatomy items with realistic radiological language
 - Designed for selective inclusion/exclusion of individual anatomical items in report generation
-- Consistent interface pattern with existing `techniqueTemplates.ts`
+- Consistent interface pattern with existing `techniqueTemplates.ts`---
+Task ID: ohif-global
+Agent: Main
+Task: Fix OHIF viewer not showing — make it a global fixed right panel
+
+Work Log:
+- Diagnosed issue: OHIFViewer component existed but was only rendered inside ReportForm (New Report tab), not globally
+- Added `showOhifViewer`, `setShowOhifViewer`, `ohifViewerWidth`, `setOhifViewerWidth` to Zustand global store
+- Rewrote OHIFViewer component to be self-contained: fetches orthancUrl from hospital-settings API, uses global store for width
+- Moved OHIFViewer rendering from ReportForm to page.tsx as a global fixed panel
+- Added "Viewer" toggle button in the header (green when active, "Viewer On" label)
+- Main content area and footer get `margin-right` equal to viewer width when viewer is open, so content doesn't hide behind it
+- Fixed viewer z-index (z-30, below header z-40) and top offset (top-14, below 56px header) so header tabs remain clickable
+- Added "Integrations" section to SettingsPage with Orthanc Server URL input field and Ollama AI info
+- Added `orthancUrl` to hospital settings state in SettingsPage
+- Removed local OHIFViewer import/render/showViewer state from ReportForm
+- ReportForm "DICOM" button now toggles the global viewer via useAppStore
+- Fixed extra `</div>` tag in ReportForm that caused "Unterminated regexp literal" build error
+
+Stage Summary:
+- OHIF DICOM Viewer now appears as a global fixed panel on the right side, visible across ALL tabs
+- Toggle via "Viewer" button in header OR "DICOM" button in ReportForm
+- Viewer shows placeholder with instructions when Orthanc URL not configured
+- Width adjustable via slider (20-70%), collapsible via double-click or button, closable via X or Esc
+- Orthanc URL configurable in Settings → Integrations tab
+- Main content and footer shift left when viewer is open

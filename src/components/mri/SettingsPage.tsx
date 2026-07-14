@@ -12,7 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import {
   Save, Plus, Trash2, Loader2, Building2, Stethoscope, FileCheck,
-  Upload, ImageIcon, X, Layout, Printer,
+  Upload, ImageIcon, X, Layout, Printer, Monitor,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -50,6 +50,7 @@ export default function SettingsPage() {
     accreditation: '', accreditationNumber: '',
     footerMessage: 'Thank you for choosing our services.',
     reportHeaderColor: '#1e3a5f',
+    orthancUrl: '',
     // Layout options
     reportLayout: 'classic',
     showTechnique: true, showComparison: true, showClinicalInfo: true,
@@ -63,7 +64,7 @@ export default function SettingsPage() {
   const [newAbnormal, setNewAbnormal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [activeSettingsSection, setActiveSettingsSection] = useState<'branding' | 'radiologist' | 'layout' | 'findings'>('branding');
+  const [activeSettingsSection, setActiveSettingsSection] = useState<'branding' | 'radiologist' | 'layout' | 'integrations' | 'findings'>('branding');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load hospital settings
@@ -162,6 +163,7 @@ export default function SettingsPage() {
           { key: 'branding', label: 'Branding', icon: Building2 },
           { key: 'layout', label: 'Print Layout', icon: Printer },
           { key: 'radiologist', label: 'Radiologist', icon: Stethoscope },
+          { key: 'integrations', label: 'Integrations', icon: Monitor },
           { key: 'findings', label: 'Findings', icon: FileCheck },
         ] as const).map(({ key, label, icon: Icon }) => (
           <button
@@ -394,6 +396,74 @@ export default function SettingsPage() {
             <div className="space-y-1.5">
               <Label>Accreditation</Label>
               <Input value={hospital.accreditation} onChange={e => setHospital(p => ({ ...p, accreditation: e.target.value }))} placeholder="NABL" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ==================== INTEGRATIONS ==================== */}
+      {activeSettingsSection === 'integrations' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2"><Monitor className="w-4 h-4" /> Integrations</CardTitle>
+            <CardDescription>Connect external services like PACS and AI</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Orthanc / OHIF Viewer */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                  <Monitor className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Orthanc PACS / OHIF Viewer</p>
+                  <p className="text-[11px] text-muted-foreground">Embed DICOM viewer panel on the right side of the app</p>
+                </div>
+              </div>
+              <div className="space-y-1.5 pl-10">
+                <Label>Orthanc Server URL</Label>
+                <Input
+                  value={hospital.orthancUrl}
+                  onChange={e => setHospital(p => ({ ...p, orthancUrl: e.target.value }))}
+                  placeholder="http://192.168.1.100:8042"
+                  type="url"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  The base URL of your Orthanc server. OHIF must be deployed at <code className="bg-muted px-1 rounded">{hospital.orthancUrl || 'http://...:8042'}/ohif/</code>
+                </p>
+                {hospital.orthancUrl && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[11px] text-muted-foreground">Viewer URL will be:</span>
+                    <code className="text-[11px] bg-muted px-2 py-0.5 rounded break-all">
+                      {hospital.orthancUrl.replace(/\/+$/, '')}/ohif/
+                    </code>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Ollama AI */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-violet-700 dark:text-violet-400" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Ollama AI (Local)</p>
+                  <p className="text-[11px] text-muted-foreground">AI-assisted report writing, findings, and impressions</p>
+                </div>
+              </div>
+              <div className="pl-10 space-y-1.5">
+                <p className="text-[11px] text-muted-foreground">
+                  Ollama runs on <code className="bg-muted px-1 rounded">http://localhost:11434</code> by default.
+                  Ensure Ollama is installed and a model like <code className="bg-muted px-1 rounded">llama3.2</code> is pulled.
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Set <code className="bg-muted px-1 rounded">OLLAMA_URL</code> env variable to change the default URL.
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>

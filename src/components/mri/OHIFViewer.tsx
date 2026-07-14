@@ -3,29 +3,34 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { X, Maximize2, Minimize2, Scan } from 'lucide-react';
+import { X, Maximize2, Minimize2, Scan, Eye } from 'lucide-react';
+import { useAppStore } from '@/lib/store';
 
-interface OHIFViewerProps {
-  orthancUrl: string;
-  studyInstanceUid?: string;
-  onClose?: () => void;
-}
+export default function OHIFViewer() {
+  const orthancUrl = useAppStore((s) => {
+    // We'll get orthancUrl from hospitalSettings passed via context or prop
+    return '';
+  });
+  const { showOhifViewer, setShowOhifViewer, ohifViewerWidth, setOhifViewerWidth } = useAppStore();
+  const [localCollapsed, setLocalCollapsed] = useState(false);
+  const [orthancUrlLocal, setOrthancUrlLocal] = useState('');
 
-export default function OHIFViewer({
-  orthancUrl,
-  studyInstanceUid,
-  onClose,
-}: OHIFViewerProps) {
-  const [widthPercent, setWidthPercent] = useState(40);
-  const [collapsed, setCollapsed] = useState(false);
+  // Fetch hospital settings for orthanc URL
+  useEffect(() => {
+    fetch('/api/reports/hospital-settings')
+      .then(r => r.json())
+      .then(data => {
+        if (data.settings?.orthancUrl) {
+          setOrthancUrlLocal(data.settings.orthancUrl);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Build the OHIF viewer URL
   const getViewerUrl = (): string => {
-    if (!orthancUrl) return '';
-    const base = orthancUrl.replace(/\/+$/, '');
-    if (studyInstanceUid) {
-      return `${base}/ohif/viewer?studyUID=${encodeURIComponent(studyInstanceUid)}`;
-    }
+    if (!orthancUrlLocal) return '';
+    const base = orthancUrlLocal.replace(/\/+$/, '');
     return `${base}/ohif/`;
   };
 
@@ -34,29 +39,30 @@ export default function OHIFViewer({
   // Keyboard shortcut: Escape to close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && onClose) {
-        onClose();
+      if (e.key === 'Escape') {
+        setShowOhifViewer(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [setShowOhifViewer]);
 
   const handleDoubleClickHeader = () => {
-    setCollapsed((prev) => !prev);
+    setLocalCollapsed((prev) => !prev);
   };
 
   const handleSliderChange = (value: number[]) => {
-    // Ensure value stays within 30-70 range
-    const clamped = Math.min(70, Math.max(30, value[0]));
-    setWidthPercent(clamped);
-    if (collapsed) setCollapsed(false);
+    const clamped = Math.min(70, Math.max(20, value[0]));
+    setOhifViewerWidth(clamped);
+    if (localCollapsed) setLocalCollapsed(false);
   };
+
+  if (!showOhifViewer) return null;
 
   return (
     <div
-      className="fixed top-0 right-0 h-screen z-50 flex flex-col border-l border-border bg-background shadow-2xl"
-      style={{ width: collapsed ? 'auto' : `${widthPercent}vw` }}
+      className="fixed top-14 right-0 h-[calc(100vh-3.5rem)] z-30 flex flex-col border-l border-border bg-background shadow-2xl transition-[width] duration-200 ease-out"
+      style={{ width: localCollapsed ? 'auto' : `${ohifViewerWidth}vw` }}
     >
       {/* Header bar */}
       <div
@@ -64,26 +70,26 @@ export default function OHIFViewer({
         onDoubleClick={handleDoubleClickHeader}
         title="Double-click to collapse/expand"
       >
-        <Scan className="h-4 w-4 text-muted-foreground shrink-0" />
+        <Eye className="h-4 w-4 text-primary shrink-0" />
 
         <span className="text-sm font-semibold truncate">
           DICOM Viewer
         </span>
 
         {/* Width slider — hidden when collapsed */}
-        {!collapsed && (
+        {!localCollapsed && (
           <div className="flex items-center gap-2 ml-2 flex-1 min-w-0">
-            <span className="text-xs text-muted-foreground shrink-0">Width</span>
+            <span className="text-xs text-muted-foreground shrink-0 hidden sm:inline">Width</span>
             <Slider
-              value={[widthPercent]}
-              min={30}
+              value={[ohifViewerWidth]}
+              min={20}
               max={70}
               step={1}
               onValueChange={handleSliderChange}
               className="flex-1"
             />
             <span className="text-xs text-muted-foreground tabular-nums w-8 text-right shrink-0">
-              {widthPercent}%
+              {ohifViewerWidth}%
             </span>
           </div>
         )}
@@ -95,11 +101,11 @@ export default function OHIFViewer({
           className="h-7 w-7 shrink-0"
           onClick={(e) => {
             e.stopPropagation();
-            setCollapsed((prev) => !prev);
+            setLocalCollapsed((prev) => !prev);
           }}
-          title={collapsed ? 'Expand viewer' : 'Collapse viewer'}
+          title={localCollapsed ? 'Expand viewer' : 'Collapse viewer'}
         >
-          {collapsed ? (
+          {localCollapsed ? (
             <Maximize2 className="h-3.5 w-3.5" />
           ) : (
             <Minimize2 className="h-3.5 w-3.5" />
@@ -107,32 +113,33 @@ export default function OHIFViewer({
         </Button>
 
         {/* Close button */}
-        {onClose && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 shrink-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            title="Close viewer"
-          >
-            <X className="h-3.5 w-3.5" />
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowOhifViewer(false);
+          }}
+          title="Close viewer (Esc)"
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
       </div>
 
       {/* Iframe / placeholder content */}
-      {!collapsed && (
+      {!localCollapsed && (
         <div className="flex-1 relative overflow-hidden">
-          {!orthancUrl ? (
+          {!orthancUrlLocal ? (
             // No URL configured — show placeholder
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-muted-foreground p-6">
               <Scan className="h-12 w-12 opacity-40" />
-              <p className="text-sm text-center">
-                Configure Orthanc/OHIF URL in Settings
-              </p>
+              <div className="text-center space-y-2">
+                <p className="text-sm font-medium">Orthanc/OHIF Not Configured</p>
+                <p className="text-xs text-muted-foreground max-w-[240px]">
+                  Go to <strong>Settings</strong> and set the Orthanc PACS URL to enable the DICOM viewer.
+                </p>
+              </div>
             </div>
           ) : (
             // Embedded OHIF viewer

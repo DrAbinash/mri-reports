@@ -6,6 +6,7 @@ import ReportList from '@/components/mri/ReportList';
 import ReportForm from '@/components/mri/ReportForm';
 import Dashboard from '@/components/mri/Dashboard';
 import SettingsPage from '@/components/mri/SettingsPage';
+import OHIFViewer from '@/components/mri/OHIFViewer';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useState, useEffect, useCallback } from 'react';
 import type { TemplateData } from '@/lib/store';
@@ -20,8 +21,11 @@ import {
   AlertTriangle,
   CheckCircle,
   Loader2,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 function ComponentGuard({ children, fallback }: { children: React.ReactNode; fallback?: React.ReactNode }) {
   const [error, setError] = useState<Error | null>(null);
@@ -43,7 +47,7 @@ function ComponentGuard({ children, fallback }: { children: React.ReactNode; fal
 }
 
 export default function Home() {
-  const { activeTab, setActiveTab } = useAppStore();
+  const { activeTab, setActiveTab, showOhifViewer, setShowOhifViewer, ohifViewerWidth } = useAppStore();
   const [templates, setTemplates] = useState<TemplateData | null>(null);
   const [hospitalSettings, setHospitalSettings] = useState<Record<string, string | null> | null>(null);
   const [dbStatus, setDbStatus] = useState<'checking' | 'healthy' | 'broken' | 'fixing'>('checking');
@@ -62,7 +66,6 @@ export default function Home() {
       .then(r => r.json())
       .then(setTemplates)
       .catch(() => {
-        // Return hardcoded fallbacks
         setTemplates({
           bodyRegions: ['Brain', 'Spine - Cervical', 'Spine - Thoracic', 'Spine - Lumbar', 'Knee', 'Shoulder', 'Hip', 'Elbow', 'Wrist', 'Ankle', 'Foot', 'Hand', 'Abdomen', 'Pelvis', 'Chest', 'Neck', 'Cardiac', 'Breast', 'Prostate', 'Other'],
           studyTypes: { Brain: ['T1', 'T2', 'FLAIR', 'DWI/ADC'] },
@@ -71,7 +74,7 @@ export default function Home() {
         });
       });
 
-    // Fetch hospital settings (for OHIF URL etc.)
+    // Fetch hospital settings
     fetch('/api/reports/hospital-settings')
       .then(r => r.json())
       .then(data => setHospitalSettings(data.settings || null))
@@ -91,7 +94,6 @@ export default function Home() {
       const data = await res.json();
       if (data.success) {
         setDbStatus('healthy');
-        // Reload templates
         fetch('/api/reports/templates')
           .then(r => r.json())
           .then(setTemplates)
@@ -109,46 +111,75 @@ export default function Home() {
     setActiveTab(value as TabValue);
   };
 
+  // Calculate main content right offset when viewer is open
+  const contentStyle = showOhifViewer
+    ? { marginRight: `${ohifViewerWidth}vw`, transition: 'margin-right 0.2s ease-out' }
+    : { marginRight: 0, transition: 'margin-right 0.2s ease-out' };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
                 <Database className="w-4 h-4 text-primary-foreground" />
               </div>
-              <div>
+              <div className="hidden sm:block">
                 <h1 className="text-lg font-bold tracking-tight leading-none">MRI Report Manager</h1>
                 <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Synology-Deployable</p>
               </div>
             </div>
-            <Tabs value={activeTab} onValueChange={handleTabChange} className="w-auto">
-              <TabsList className="h-9">
-                <TabsTrigger value="create" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
-                  <FilePlus className="w-3.5 h-3.5 hidden sm:block" />
-                  <span className="hidden sm:inline">New Report</span>
-                  <span className="sm:hidden">New</span>
-                </TabsTrigger>
-                <TabsTrigger value="reports" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
-                  <FileText className="w-3.5 h-3.5 hidden sm:block" />
-                  <span>Reports</span>
-                </TabsTrigger>
-                <TabsTrigger value="upload" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
-                  <Upload className="w-3.5 h-3.5 hidden sm:block" />
-                  <span>Upload</span>
-                </TabsTrigger>
-                <TabsTrigger value="dashboard" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
-                  <LayoutDashboard className="w-3.5 h-3.5 hidden sm:block" />
-                  <span>Dashboard</span>
-                </TabsTrigger>
-                <TabsTrigger value="settings" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
-                  <Settings className="w-3.5 h-3.5 hidden sm:block" />
-                  <span>Settings</span>
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+
+            <div className="flex items-center gap-2">
+              <Tabs value={activeTab} onValueChange={handleTabChange} className="w-auto">
+                <TabsList className="h-9">
+                  <TabsTrigger value="create" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
+                    <FilePlus className="w-3.5 h-3.5 hidden sm:block" />
+                    <span className="hidden sm:inline">New Report</span>
+                    <span className="sm:hidden">New</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="reports" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
+                    <FileText className="w-3.5 h-3.5 hidden sm:block" />
+                    <span>Reports</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="upload" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
+                    <Upload className="w-3.5 h-3.5 hidden sm:block" />
+                    <span>Upload</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="dashboard" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
+                    <LayoutDashboard className="w-3.5 h-3.5 hidden sm:block" />
+                    <span>Dashboard</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="settings" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
+                    <Settings className="w-3.5 h-3.5 hidden sm:block" />
+                    <span>Settings</span>
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              {/* OHIF Viewer Toggle Button */}
+              <Button
+                variant={showOhifViewer ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowOhifViewer(!showOhifViewer)}
+                className={cn(
+                  'gap-1.5 shrink-0',
+                  showOhifViewer && 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                )}
+                title={showOhifViewer ? 'Hide DICOM Viewer' : 'Show DICOM Viewer'}
+              >
+                {showOhifViewer ? (
+                  <EyeOff className="w-3.5 h-3.5" />
+                ) : (
+                  <Eye className="w-3.5 h-3.5" />
+                )}
+                <span className="hidden md:inline text-xs">
+                  {showOhifViewer ? 'Viewer On' : 'Viewer'}
+                </span>
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -184,27 +215,29 @@ export default function Home() {
         </div>
       )}
 
-      {/* Main Content */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {activeTab === 'upload' && <ComponentGuard><FolderUpload /></ComponentGuard>}
-        {activeTab === 'reports' && <ComponentGuard><ReportList /></ComponentGuard>}
-        {activeTab === 'create' && (
-          <ComponentGuard>
-            <ReportForm
-              editId="new"
-              onComplete={() => setActiveTab('reports')}
-              onCancel={() => setActiveTab('reports')}
-              templates={templates}
-              hospitalSettings={hospitalSettings}
-            />
-          </ComponentGuard>
-        )}
-        {activeTab === 'dashboard' && <ComponentGuard><Dashboard /></ComponentGuard>}
-        {activeTab === 'settings' && <ComponentGuard><SettingsPage /></ComponentGuard>}
+      {/* Main Content — shifts left when OHIF viewer is open */}
+      <main className="flex-1 w-full" style={contentStyle}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          {activeTab === 'upload' && <ComponentGuard><FolderUpload /></ComponentGuard>}
+          {activeTab === 'reports' && <ComponentGuard><ReportList /></ComponentGuard>}
+          {activeTab === 'create' && (
+            <ComponentGuard>
+              <ReportForm
+                editId="new"
+                onComplete={() => setActiveTab('reports')}
+                onCancel={() => setActiveTab('reports')}
+                templates={templates}
+                hospitalSettings={hospitalSettings}
+              />
+            </ComponentGuard>
+          )}
+          {activeTab === 'dashboard' && <ComponentGuard><Dashboard /></ComponentGuard>}
+          {activeTab === 'settings' && <ComponentGuard><SettingsPage /></ComponentGuard>}
+        </div>
       </main>
 
       {/* Sticky Footer */}
-      <footer className="border-t mt-auto">
+      <footer className="border-t mt-auto" style={contentStyle}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between text-xs text-muted-foreground">
           <span>MRI Report Manager — Synology NAS Ready</span>
           <a
@@ -216,6 +249,9 @@ export default function Home() {
           </a>
         </div>
       </footer>
+
+      {/* Global OHIF DICOM Viewer — fixed right panel */}
+      <OHIFViewer />
     </div>
   );
 }

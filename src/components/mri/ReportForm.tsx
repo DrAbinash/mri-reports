@@ -5,7 +5,6 @@ import { useAppStore, type TemplateData } from '@/lib/store';
 import { generateTechnique, generateStudyHeading, combineBodyRegions, combineStudyTypes, getDefaultsForRegion, type Study } from '@/lib/techniqueTemplates';
 import { NORMAL_ANATOMY, type AnatomyItem } from '@/lib/normalAnatomy';
 import FindingCheckboxes from './FindingCheckboxes';
-import OHIFViewer from './OHIFViewer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -38,7 +37,6 @@ export default function ReportForm({ editId, onComplete, onCancel, templates, ho
     { bodyRegion: 'Brain', studyTypes: getDefaultsForRegion('Brain', false) }
   ]);
   const [techniqueManuallyEdited, setTechniqueManuallyEdited] = useState(false);
-  const [showViewer, setShowViewer] = useState(false);
   const [aiLoading, setAiLoading] = useState<string | null>(null);
   const [studyInstanceUid, setStudyInstanceUid] = useState('');
   const [excludedAnatomy, setExcludedAnatomy] = useState<Set<string>>(new Set());
@@ -273,11 +271,11 @@ export default function ReportForm({ editId, onComplete, onCancel, templates, ho
     return <div className="space-y-4"><Skeleton className="h-10 w-64" /><Card><CardContent className="p-6"><Skeleton className="h-96 w-full" /></CardContent></Card></div>;
   }
 
+  const { showOhifViewer, setShowOhifViewer } = useAppStore();
+
   return (
-    <div className="flex gap-0">
-      {/* Main form — takes remaining width */}
-      <div className={`min-w-0 transition-all duration-300 ${showViewer ? 'mr-0' : ''}`} style={showViewer ? { width: '60%' } : { width: '100%' }}>
-        <div className="space-y-4">
+    <div>
+      <div className="space-y-4">
           {/* Header */}
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={onCancel}><ArrowLeft className="w-4 h-4 mr-2" />Back</Button>
@@ -288,8 +286,8 @@ export default function ReportForm({ editId, onComplete, onCancel, templates, ho
                 {studies.length > 1 && <span className="text-xs text-muted-foreground">{studies.length} studies</span>}
               </div>
             </div>
-            {/* DICOM Viewer toggle */}
-            <Button variant={showViewer ? 'default' : 'outline'} size="sm" onClick={() => setShowViewer(v => !v)} className="gap-1.5">
+            {/* DICOM Viewer toggle — opens global viewer */}
+            <Button variant={showOhifViewer ? 'default' : 'outline'} size="sm" onClick={() => setShowOhifViewer(!showOhifViewer)} className="gap-1.5">
               <Scan className="w-3.5 h-3.5" /> DICOM
             </Button>
           </div>
@@ -506,18 +504,6 @@ export default function ReportForm({ editId, onComplete, onCancel, templates, ho
             </ScrollArea>
           </form>
         </div>
-      </div>
-
-      {/* OHIF DICOM Viewer — sticky right panel */}
-      {showViewer && (
-        <div className="w-[40%] min-w-[300px] sticky top-14 self-start h-[calc(100vh-4rem)]">
-          <OHIFViewer
-            orthancUrl={hospitalSettings?.orthancUrl || ''}
-            studyInstanceUid={studyInstanceUid || undefined}
-            onClose={() => setShowViewer(false)}
-          />
-        </div>
-      )}
     </div>
   );
 }

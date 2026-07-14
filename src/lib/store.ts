@@ -94,6 +94,12 @@ interface AppState {
   setFilterStatus: (s: string) => void;
   filterPriority: string;
   setFilterPriority: (p: string) => void;
+
+  // OHIF Viewer
+  showOhifViewer: boolean;
+  setShowOhifViewer: (v: boolean) => void;
+  ohifViewerWidth: number;
+  setOhifViewerWidth: (w: number) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -119,4 +125,9 @@ export const useAppStore = create<AppState>((set) => ({
   setFilterStatus: (s) => set({ filterStatus: s }),
   filterPriority: '',
   setFilterPriority: (p) => set({ filterPriority: p }),
+
+  showOhifViewer: false,
+  setShowOhifViewer: (v) => set({ showOhifViewer: v }),
+  ohifViewerWidth: 40,
+  setOhifViewerWidth: (w) => set({ ohifViewerWidth: w }),
 }));
