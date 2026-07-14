@@ -24,8 +24,6 @@ export default function Home() {
   const [templates, setTemplates] = useState<TemplateData | null>(null);
 
   useEffect(() => {
-    // Auto-migrate database on first load (ensures tables exist on Synology)
-    fetch('/api/migrate').catch(() => {});
     fetch('/api/reports/templates')
       .then(r => r.json())
       .then(setTemplates)
