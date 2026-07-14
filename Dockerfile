@@ -35,14 +35,15 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# Copy Prisma schema for runtime migrations
+# Copy Prisma schema + CLI + engine for runtime migrations
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 
 # Create data directories with proper ownership
 RUN mkdir -p /app/data/uploads/organized /app/data/db && \
-    chown -R nextjs:nodejs /app/data
+    chown -R nextjs:nodejs /app/data /app/node_modules
 
 # Copy and set up entrypoint
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh

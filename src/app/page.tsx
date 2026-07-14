@@ -24,6 +24,8 @@ export default function Home() {
   const [templates, setTemplates] = useState<TemplateData | null>(null);
 
   useEffect(() => {
+    // Auto-migrate database on first load (ensures tables exist on Synology)
+    fetch('/api/migrate').catch(() => {});
     fetch('/api/reports/templates')
       .then(r => r.json())
       .then(setTemplates)
@@ -53,18 +55,18 @@ export default function Home() {
             </div>
             <Tabs value={activeTab} onValueChange={handleTabChange} className="w-auto">
               <TabsList className="h-9">
-                <TabsTrigger value="upload" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
-                  <Upload className="w-3.5 h-3.5 hidden sm:block" />
-                  <span>Upload</span>
+                <TabsTrigger value="create" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
+                  <FilePlus className="w-3.5 h-3.5 hidden sm:block" />
+                  <span className="hidden sm:inline">New Report</span>
+                  <span className="sm:hidden">New</span>
                 </TabsTrigger>
                 <TabsTrigger value="reports" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
                   <FileText className="w-3.5 h-3.5 hidden sm:block" />
                   <span>Reports</span>
                 </TabsTrigger>
-                <TabsTrigger value="create" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
-                  <FilePlus className="w-3.5 h-3.5 hidden sm:block" />
-                  <span className="hidden sm:inline">New Report</span>
-                  <span className="sm:hidden">New</span>
+                <TabsTrigger value="upload" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
+                  <Upload className="w-3.5 h-3.5 hidden sm:block" />
+                  <span>Upload</span>
                 </TabsTrigger>
                 <TabsTrigger value="dashboard" className="text-xs sm:text-sm px-2 sm:px-3 gap-1.5">
                   <LayoutDashboard className="w-3.5 h-3.5 hidden sm:block" />

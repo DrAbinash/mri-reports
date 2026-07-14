@@ -97,7 +97,7 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  activeTab: 'upload',
+  activeTab: 'create',
   setActiveTab: (tab) => set({ activeTab: tab }),
 
   selectedReportId: null,
