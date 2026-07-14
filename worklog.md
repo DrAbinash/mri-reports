@@ -78,3 +78,85 @@ Stage Summary:
 - Print button still uses `window.print()` for direct printing
 - All 5+ API endpoints verified returning 200
 - App compiles and serves successfully
+
+---
+Task ID: 4
+Agent: Sub-agent (general-purpose)
+Task: Create Ollama AI integration API route
+
+Work Log:
+- Created `/src/app/api/ai/route.ts` — Next.js App Router API route for local Ollama proxy
+- Implemented GET handler: checks Ollama availability via `/api/tags` with 3-second timeout, returns `{ available, models }`
+- Implemented POST handler with 4 action modes:
+  - Default: free-form text generation with optional context prepended to prompt
+  - `action: "impression"`: generates concise clinical impression from MRI findings
+  - `action: "findings"`: generates structured findings for a body region + clinical indication
+  - `action: "normal"`: generates normal MRI anatomy description for a body region
+- Model resolution: uses specified model → first available model from Ollama → fallback to `llama3.2`
+- All timeouts via `AbortSignal.timeout()` (3s for health check, 30s for generation)
+- Proper error handling: returns `{ error: string }` with status 500 on failures, 400 for missing fields
+- Appended work record to worklog.md
+
+Stage Summary:
+- Ollama AI integration route created at `/api/ai`
+- Supports availability check (GET) and text generation (POST) with 3 specialized radiology action modes
+- Fully typed with `NextRequest`/`NextResponse`, env-driven `OLLAMA_URL` with sensible default
+
+---
+Task ID: 4
+Agent: general-purpose
+Task: Create OHIFViewer component for DICOM viewer embedding
+
+Work Log:
+- Verified shadcn/ui Slider component exists at src/components/ui/slider.tsx (Radix-based, accepts array values)
+- Created src/components/mri/OHIFViewer.tsx — a self-contained drop-in panel component
+- Props: orthancUrl (string), studyInstanceUid (optional), onClose (optional callback)
+- Header bar with Scan icon, title, width slider (30-70% vw, default 40%), collapse/expand toggle, close button
+- Double-click header toggles collapsed state (shows only header when collapsed)
+- Slider uses shadcn/ui Slider component with onValueChange handler and clamped range
+- OHIF URL construction: appends /ohif/viewer?studyUID=... when studyInstanceUid provided, otherwise /ohif/ root
+- Placeholder message when orthancUrl is empty
+- Escape key listener closes the viewer
+- iframe fills remaining space with absolute positioning, allow clipboard access
+- Fixed positioning (top-0 right-0, z-50) for overlay panel behavior
+- All styling via Tailwind CSS; icons from lucide-react (X, Maximize2, Minimize2, Scan)
+
+Stage Summary:
+- OHIFViewer.tsx created as a drop-in DICOM viewer panel
+- Resizable 30-70% viewport width with smooth slider control
+- Collapsible via double-click header or toggle button
+- Proper URL construction for study-specific and browse modes
+- Graceful placeholder when Orthanc URL not configured
+
+---
+Task ID: 5
+Agent: Sub-agent (general-purpose)
+Task: Create normal anatomy description templates for MRI reports
+
+Work Log:
+- Reviewed existing project structure, `techniqueTemplates.ts` patterns, and `worklog.md` conventions
+- Created `/src/lib/normalAnatomy.ts` with `AnatomyItem` interface and `NORMAL_ANATOMY` record
+- Implemented 14 body regions with a total of 98 individual anatomy items:
+  - Brain (10 items: parenchyma, ventricles, extra-axial spaces, sella, posterior fossa, major vessels, cavernous sinuses, orbits, paranasal sinuses, mastoid air cells)
+  - Spine - Cervical (7 items: alignment, vertebral bodies, prevertebral space, disc spaces, spinal cord, nerve roots, paraspinal soft tissues)
+  - Spine - Lumbar (8 items: alignment, vertebral bodies, disc spaces, conus medullaris, cauda equina, nerve roots, facet joints, paraspinal soft tissues)
+  - Knee (8 items: menisci, cruciate ligaments, collateral ligaments, extensor mechanism, cartilage, bone marrow, synovium, popliteal fossa)
+  - Shoulder (8 items: rotator cuff, biceps tendon, labrum, glenohumeral joint, AC joint, subacromial bursa, bone marrow, muscles)
+  - Hip (7 items: femoral head/neck, acetabulum, labrum, joint space, muscles, tendons, bone marrow)
+  - Abdomen (9 items: liver, gallbladder, spleen, pancreas, kidneys, adrenals, bowel, lymph nodes, vasculature)
+  - Pelvis (8 items: bladder, uterus, prostate, rectum, pelvic sidewalls, lymph nodes, bones, muscles)
+  - Chest (8 items: lungs, mediastinum, heart, great vessels, pleura, chest wall, diaphragm, upper abdomen)
+  - Neck (9 items: nasopharynx, oropharynx, larynx, thyroid, salivary glands, lymph nodes, vessels, carotid sheath, spine)
+  - Cardiac (6 items: chamber sizes, wall thickness, valve morphology, systolic function, pericardium, coronary arteries)
+  - Breast (5 items: fibroglandular tissue, parenchymal enhancement, lesions, axilla, pectoral muscles)
+  - Prostate (5 items: zonal anatomy, peripheral zone, transition zone, seminal vesicles, neurovascular bundles)
+  - Other (5 items: soft tissues, bones, joints, vasculature, lymph nodes)
+- Each item has a unique `key`, human-readable `label`, and realistic radiological `text` description
+- Verified the file compiles cleanly with `tsc --noEmit` (zero errors)
+- Appended work record to worklog.md
+
+Stage Summary:
+- Created `/src/lib/normalAnatomy.ts` — comprehensive MRI normal anatomy template library
+- 14 body regions, 98 selectable anatomy items with realistic radiological language
+- Designed for selective inclusion/exclusion of individual anatomical items in report generation
+- Consistent interface pattern with existing `techniqueTemplates.ts`

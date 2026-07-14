@@ -45,6 +45,7 @@ function ComponentGuard({ children, fallback }: { children: React.ReactNode; fal
 export default function Home() {
   const { activeTab, setActiveTab } = useAppStore();
   const [templates, setTemplates] = useState<TemplateData | null>(null);
+  const [hospitalSettings, setHospitalSettings] = useState<Record<string, string | null> | null>(null);
   const [dbStatus, setDbStatus] = useState<'checking' | 'healthy' | 'broken' | 'fixing'>('checking');
 
   const checkDb = useCallback(() => {
@@ -69,6 +70,12 @@ export default function Home() {
           customTemplates: [],
         });
       });
+
+    // Fetch hospital settings (for OHIF URL etc.)
+    fetch('/api/reports/hospital-settings')
+      .then(r => r.json())
+      .then(data => setHospitalSettings(data.settings || null))
+      .catch(() => {});
 
     // Seed findings in background
     fetch('/api/reports/seed-findings', { method: 'POST' }).catch(() => {});
@@ -188,6 +195,7 @@ export default function Home() {
               onComplete={() => setActiveTab('reports')}
               onCancel={() => setActiveTab('reports')}
               templates={templates}
+              hospitalSettings={hospitalSettings}
             />
           </ComponentGuard>
         )}

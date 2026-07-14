@@ -3,8 +3,36 @@
 
 export interface Study {
   bodyRegion: string;
-  studyType: string;
+  studyTypes: string[]; // Multiple study types selected (e.g., ['T1', 'T2', 'FLAIR', 'DWI/ADC'])
 }
+
+// Default standard sequences per body region (configurable from Settings)
+export const DEFAULT_SEQUENCES: Record<string, string[]> = {
+  'Brain': ['T1', 'T2', 'FLAIR', 'DWI/ADC', 'GRE/SWI'],
+  'Brain + Contrast': ['T1', 'T2', 'FLAIR', 'DWI/ADC', 'GRE/SWI', 'T1-Contrast'],
+  'Spine - Cervical': ['T1 Sagittal', 'T2 Sagittal', 'T2 Axial', 'STIR'],
+  'Spine - Cervical + Contrast': ['T1 Sagittal', 'T2 Sagittal', 'T2 Axial', 'STIR', 'T1-Contrast'],
+  'Spine - Thoracic': ['T1 Sagittal', 'T2 Sagittal', 'T2 Axial', 'STIR'],
+  'Spine - Lumbar': ['T1 Sagittal', 'T2 Sagittal', 'T2 Axial', 'STIR'],
+  'Spine - Lumbar + Contrast': ['T1 Sagittal', 'T2 Sagittal', 'T2 Axial', 'STIR', 'T1-Contrast'],
+  'Spine - Sacral': ['T1', 'T2', 'STIR'],
+  'Knee': ['T1', 'T2 Fat Sat', 'PD Fat Sat'],
+  'Shoulder': ['T1', 'T2 Fat Sat', 'PD Fat Sat'],
+  'Hip': ['T1', 'T2', 'STIR', 'T2 Fat Sat'],
+  'Elbow': ['T1', 'T2 Fat Sat', 'PD Fat Sat'],
+  'Wrist': ['T1', 'T2', 'T2 Fat Sat'],
+  'Ankle': ['T1', 'T2 Fat Sat', 'PD Fat Sat'],
+  'Foot': ['T1', 'T2 Fat Sat', 'PD Fat Sat'],
+  'Hand': ['T1', 'T2 Fat Sat', 'PD Fat Sat'],
+  'Abdomen': ['T1', 'T2', 'T2 Fat Sat', 'DWI/ADC', 'T1-Contrast'],
+  'Pelvis': ['T1', 'T2', 'T2 Fat Sat', 'DWI/ADC', 'T1-Contrast'],
+  'Chest': ['T1', 'T2', 'T2 Fat Sat', 'DWI/ADC', 'T1-Contrast'],
+  'Neck': ['T1', 'T2', 'T2 Fat Sat', 'STIR', 'T1-Contrast'],
+  'Cardiac': ['Cine SSFP', 'T1 Mapping', 'T2 Mapping', 'LGE'],
+  'Breast': ['T1', 'T2', 'DWI/ADC', 'T1-Contrast'],
+  'Prostate': ['T2', 'DWI/ADC', 'DCE', 'T1-Contrast'],
+  'Other': ['T1', 'T2', 'STIR'],
+};
 
 // Sequence descriptions per study type, per body region
 const SEQUENCE_MAP: Record<string, Record<string, string>> = {
@@ -233,7 +261,7 @@ function techniqueForStudy(
   const agent = contrastAgent || 'gadolinium-based contrast';
 
   const region = study.bodyRegion;
-  const studyType = study.studyType;
+  const studyTypes = study.studyTypes;
 
   // 1. Start with base or contrast prefix
   let baseText: string;
@@ -247,10 +275,28 @@ function techniqueForStudy(
       .replace('{contrastAgent}', agent);
   }
 
-  // 2. Get sequence description for this study type
-  const sequences = SEQUENCE_MAP[region]?.[studyType] || SEQUENCE_MAP['Other']?.[studyType];
-  if (sequences) {
-    baseText += ' Sequences included ' + sequences + '.';
+  // 2. Combine sequences from ALL selected study types
+  if (studyTypes.length > 0) {
+    const allSequences: string[] = [];
+    for (const st of studyTypes) {
+      const seq = SEQUENCE_MAP[region]?.[st] || SEQUENCE_MAP['Other']?.[st];
+      if (seq) {
+        // Split by comma, trim, and add non-duplicates
+        seq.split(',').map(s => s.trim()).forEach(s => {
+          if (!allSequences.some(existing => existing.toLowerCase() === s.toLowerCase())) {
+            allSequences.push(s);
+          }
+        });
+      }
+    }
+    if (allSequences.length > 0) {
+      // Format: "Sequences included A, B, C, and D."
+      if (allSequences.length === 1) {
+        baseText += ' Sequences included ' + allSequences[0] + '.';
+      } else {
+        baseText += ' Sequences included ' + allSequences.slice(0, -1).join(', ') + ', and ' + allSequences[allSequences.length - 1] + '.';
+      }
+    }
   }
 
   return baseText;
@@ -316,5 +362,13 @@ export function combineBodyRegions(studies: Study[]): string {
  * Get combined study type string for DB storage
  */
 export function combineStudyTypes(studies: Study[]): string {
-  return studies.map(s => s.studyType).join(', ');
+  return studies.map(s => s.studyTypes.join(', ')).join(' | ');
+}
+
+/**
+ * Get default sequences for a body region
+ */
+export function getDefaultsForRegion(region: string, withContrast: boolean): string[] {
+  const key = withContrast ? `${region} + Contrast` : region;
+  return DEFAULT_SEQUENCES[key] || DEFAULT_SEQUENCES[region] || ['Standard'];
 }

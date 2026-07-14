@@ -87,6 +87,8 @@ CREATE TABLE IF NOT EXISTS "HospitalSettings" (
     "patientColumns" TEXT NOT NULL DEFAULT '3',
     "impressionStyle" TEXT NOT NULL DEFAULT 'bordered',
     "headerStyle" TEXT NOT NULL DEFAULT 'full',
+    "orthancUrl" TEXT,
+    "ollamaUrl" TEXT NOT NULL DEFAULT 'http://localhost:11434',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
