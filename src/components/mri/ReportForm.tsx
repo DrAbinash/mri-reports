@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore, type TemplateData } from '@/lib/store';
+import { generateTechnique, generateStudyHeading, combineBodyRegions, combineStudyTypes, type Study } from '@/lib/techniqueTemplates';
 import FindingCheckboxes from './FindingCheckboxes';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -17,11 +19,14 @@ import {
   Save,
   Loader2,
   FileText,
+  Plus,
+  X,
+  GripVertical,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
-  editId: string | null; // 'new' for new, actual id for edit
+  editId: string | null;
   onComplete: () => void;
   onCancel: () => void;
   templates: TemplateData | null;
@@ -29,6 +34,8 @@ interface Props {
 
 export default function ReportForm({ editId, onComplete, onCancel, templates }: Props) {
   const [loading, setLoading] = useState(false);
+  const [studies, setStudies] = useState<Study[]>([{ bodyRegion: 'Brain', studyType: 'T1' }]);
+  const [techniqueManuallyEdited, setTechniqueManuallyEdited] = useState(false);
   const [formData, setFormData] = useState({
     patientName: '',
     patientId: '',
@@ -37,10 +44,8 @@ export default function ReportForm({ editId, onComplete, onCancel, templates }: 
     referringDoctor: '',
     studyDate: '',
     accessionNumber: '',
-    bodyRegion: 'Brain',
-    studyType: 'Standard',
     scannerModel: '',
-    fieldStrength: '',
+    fieldStrength: '1.5T' as string,
     clinicalIndication: '',
     clinicalHistory: '',
     technique: '',
@@ -55,6 +60,26 @@ export default function ReportForm({ editId, onComplete, onCancel, templates }: 
     priority: 'Routine',
   });
 
+  // Auto-generate technique when studies, field strength, or contrast change
+  const autoTechnique = useMemo(() => {
+    return generateTechnique(studies, formData.fieldStrength, formData.contrastAdministered, formData.contrastAgent);
+  }, [studies, formData.fieldStrength, formData.contrastAdministered, formData.contrastAgent]);
+
+  // Update technique when auto-generated version changes (unless manually edited)
+  useEffect(() => {
+    if (!techniqueManuallyEdited) {
+      setFormData(prev => ({ ...prev, technique: autoTechnique }));
+    }
+  }, [autoTechnique, techniqueManuallyEdited]);
+
+  // Combined heading
+  const studyHeading = useMemo(() => generateStudyHeading(studies), [studies]);
+
+  // Get study types for a body region
+  const getStudyTypes = useCallback((region: string) => {
+    return templates?.studyTypes?.[region] || templates?.studyTypes?.['Other'] || ['Standard'];
+  }, [templates]);
+
   // Load report for editing
   useEffect(() => {
     if (editId && editId !== 'new') {
@@ -64,6 +89,16 @@ export default function ReportForm({ editId, onComplete, onCancel, templates }: 
         .then(data => {
           if (data.report) {
             const r = data.report;
+            // Parse combined body region back to studies
+            const regions = r.bodyRegion?.split(' + ').map(s => s.trim()) || ['Brain'];
+            const types = r.studyType?.split(',').map(s => s.trim()) || [];
+            const parsedStudies: Study[] = regions.map((region, idx) => ({
+              bodyRegion: region,
+              studyType: types[idx] || getStudyTypes(region)[0] || 'Standard',
+            }));
+
+            setStudies(parsedStudies.length > 0 ? parsedStudies : [{ bodyRegion: 'Brain', studyType: 'T1' }]);
+            setTechniqueManuallyEdited(true); // Don't overwrite loaded technique
             setFormData({
               patientName: r.patientName || '',
               patientId: r.patientId || '',
@@ -72,10 +107,8 @@ export default function ReportForm({ editId, onComplete, onCancel, templates }: 
               referringDoctor: r.referringDoctor || '',
               studyDate: r.studyDate ? r.studyDate.split('T')[0] : '',
               accessionNumber: r.accessionNumber || '',
-              bodyRegion: r.bodyRegion || 'Brain',
-              studyType: r.studyType || 'Standard',
               scannerModel: r.scannerModel || '',
-              fieldStrength: r.fieldStrength || '',
+              fieldStrength: r.fieldStrength || '1.5T',
               clinicalIndication: r.clinicalIndication || '',
               clinicalHistory: r.clinicalHistory || '',
               technique: r.technique || '',
@@ -94,26 +127,53 @@ export default function ReportForm({ editId, onComplete, onCancel, templates }: 
         .catch(console.error)
         .finally(() => setLoading(false));
     }
-  }, [editId]);
+  }, [editId, getStudyTypes]);
 
   const handleChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    // If user edits technique manually, don't auto-overwrite
+    if (field === 'technique') {
+      setTechniqueManuallyEdited(true);
+    }
+  };
+
+  // Study management
+  const updateStudy = (index: number, field: 'bodyRegion' | 'studyType', value: string) => {
+    setStudies(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      // If body region changed, reset study type to first available
+      if (field === 'bodyRegion') {
+        next[index].studyType = getStudyTypes(value)[0] || 'Standard';
+      }
+      return next;
+    });
+    setTechniqueManuallyEdited(false); // Re-enable auto-generation
+  };
+
+  const addStudy = () => {
+    setStudies(prev => [...prev, { bodyRegion: 'Brain', studyType: 'T1' }]);
+    setTechniqueManuallyEdited(false);
+  };
+
+  const removeStudy = (index: number) => {
+    if (studies.length <= 1) return;
+    setStudies(prev => prev.filter((_, i) => i !== index));
+    setTechniqueManuallyEdited(false);
   };
 
   // Apply template
   const applyTemplate = (templateIdx: number) => {
     const tpl = templates?.defaultTemplates[templateIdx];
     if (tpl) {
+      const studyTypes = getStudyTypes(tpl.bodyRegion);
+      setStudies([{ bodyRegion: tpl.bodyRegion, studyType: studyTypes[0] || 'Standard' }]);
+      setTechniqueManuallyEdited(false);
       setFormData(prev => ({
         ...prev,
-        bodyRegion: tpl.bodyRegion,
-        technique: tpl.technique
-          .replace('{fieldStrength}', prev.fieldStrength || '3T')
-          .replace('{contrastAgent}', prev.contrastAgent || 'Gadolinium')
-          .replace('{side}', 'right'),
-        findings: tpl.findings || prev.findings,
-        impression: tpl.impression || prev.impression,
+        fieldStrength: prev.fieldStrength || '1.5T',
       }));
+      // Let the auto-technique generation handle the technique text
       toast.success(`Template "${tpl.name}" applied`);
     }
   };
@@ -124,6 +184,8 @@ export default function ReportForm({ editId, onComplete, onCancel, templates }: 
     try {
       const payload = {
         ...formData,
+        bodyRegion: combineBodyRegions(studies),
+        studyType: combineStudyTypes(studies),
         patientAge: formData.patientAge ? parseInt(formData.patientAge) : null,
         studyDate: formData.studyDate || null,
       };
@@ -155,7 +217,6 @@ export default function ReportForm({ editId, onComplete, onCancel, templates }: 
     if (selected.length === 0) return;
     const currentFindings = formData.findings
       .split('\n').filter(l => l.trim()).join('\n');
-    // Append new selections that aren't already in findings
     const existing = new Set(currentFindings.toLowerCase());
     const newTexts = selected
       .filter(s => !existing.has(s.text.toLowerCase()))
@@ -164,11 +225,7 @@ export default function ReportForm({ editId, onComplete, onCancel, templates }: 
       const separator = currentFindings ? '\n' : '';
       handleChange('findings', currentFindings + separator + newTexts.join('\n'));
     }
-  }, [formData.findings, handleChange]);
-
-  const studyTypes = formData.bodyRegion && templates?.studyTypes
-    ? templates.studyTypes[formData.bodyRegion] || templates.studyTypes['Other'] || ['Standard']
-    : ['Standard'];
+  }, [formData.findings]);
 
   const isEditing = editId && editId !== 'new';
 
@@ -183,14 +240,20 @@ export default function ReportForm({ editId, onComplete, onCancel, templates }: 
 
   return (
     <div className="space-y-4">
+      {/* Header with combined study heading */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" onClick={onCancel}>
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
         </Button>
-        <div>
+        <div className="flex-1">
           <h2 className="text-xl font-bold">{isEditing ? 'Edit Report' : 'Create New Report'}</h2>
-          <p className="text-sm text-muted-foreground">Fill in the MRI report details below</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <Badge variant="secondary" className="font-semibold text-xs">{studyHeading}</Badge>
+            {studies.length > 1 && (
+              <span className="text-xs text-muted-foreground">{studies.length} studies combined</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -204,7 +267,7 @@ export default function ReportForm({ editId, onComplete, onCancel, templates }: 
                   <CardTitle className="text-sm flex items-center gap-2">
                     <FileText className="w-4 h-4" /> Quick Templates
                   </CardTitle>
-                  <CardDescription>Click to auto-fill technique and structure</CardDescription>
+                  <CardDescription>Click to auto-fill study and technique</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
@@ -260,56 +323,108 @@ export default function ReportForm({ editId, onComplete, onCancel, templates }: 
               </CardContent>
             </Card>
 
-            {/* Study Details */}
+            {/* Study Details — MULTI-STUDY */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Study Details</CardTitle>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm">Study Details</CardTitle>
+                    <CardDescription>Add one or more MRI studies for this patient</CardDescription>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={addStudy} className="gap-1">
+                    <Plus className="w-3.5 h-3.5" /> Add Study
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Body Region *</Label>
-                  <Select value={formData.bodyRegion} onValueChange={v => { handleChange('bodyRegion', v); handleChange('studyType', 'Standard'); }}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {templates?.bodyRegions.map(r => (
-                        <SelectItem key={r} value={r}>{r}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <CardContent className="space-y-4">
+                {/* Study rows */}
+                <div className="space-y-3">
+                  {studies.map((study, idx) => {
+                    const types = getStudyTypes(study.bodyRegion);
+                    return (
+                      <div key={idx} className="flex items-start gap-2 p-3 rounded-lg border bg-muted/30">
+                        <div className="flex items-center gap-2 pt-2 text-muted-foreground shrink-0">
+                          <GripVertical className="w-4 h-4" />
+                          <Badge variant="outline" className="text-[10px] font-mono shrink-0">
+                            #{idx + 1}
+                          </Badge>
+                        </div>
+                        <div className="flex-1 grid sm:grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Body Region</Label>
+                            <Select
+                              value={study.bodyRegion}
+                              onValueChange={v => updateStudy(idx, 'bodyRegion', v)}
+                            >
+                              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {templates?.bodyRegions.map(r => (
+                                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Study Type</Label>
+                            <Select
+                              value={study.studyType}
+                              onValueChange={v => {
+                                updateStudy(idx, 'studyType', v);
+                                setTechniqueManuallyEdited(false);
+                              }}
+                            >
+                              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {types.map(t => (
+                                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        {studies.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="shrink-0 mt-1 h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => removeStudy(idx)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Study Type *</Label>
-                  <Select value={formData.studyType} onValueChange={v => handleChange('studyType', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {studyTypes.map(t => (
-                        <SelectItem key={t} value={t}>{t}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Study Date</Label>
-                  <Input type="date" value={formData.studyDate} onChange={e => handleChange('studyDate', e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Accession #</Label>
-                  <Input value={formData.accessionNumber} onChange={e => handleChange('accessionNumber', e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Scanner Model</Label>
-                  <Input value={formData.scannerModel} onChange={e => handleChange('scannerModel', e.target.value)} placeholder="e.g., Siemens MAGNETOM Vida" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Field Strength</Label>
-                  <Select value={formData.fieldStrength} onValueChange={v => handleChange('fieldStrength', v)}>
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1.5T">1.5T</SelectItem>
-                      <SelectItem value="3T">3T</SelectItem>
-                      <SelectItem value="7T">7T</SelectItem>
-                    </SelectContent>
-                  </Select>
+
+                {/* Other study fields */}
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t">
+                  <div className="space-y-1.5">
+                    <Label>Study Date</Label>
+                    <Input type="date" value={formData.studyDate} onChange={e => handleChange('studyDate', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Accession #</Label>
+                    <Input value={formData.accessionNumber} onChange={e => handleChange('accessionNumber', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Scanner Model</Label>
+                    <Input value={formData.scannerModel} onChange={e => handleChange('scannerModel', e.target.value)} placeholder="e.g., Siemens MAGNETOM" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Field Strength</Label>
+                    <Select value={formData.fieldStrength} onValueChange={v => handleChange('fieldStrength', v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0.5T">0.5T</SelectItem>
+                        <SelectItem value="1.0T">1.0T</SelectItem>
+                        <SelectItem value="1.5T">1.5T</SelectItem>
+                        <SelectItem value="3T">3T</SelectItem>
+                        <SelectItem value="7T">7T</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -338,7 +453,10 @@ export default function ReportForm({ editId, onComplete, onCancel, templates }: 
                   <CardTitle className="text-sm">Contrast Administration</CardTitle>
                   <Switch
                     checked={formData.contrastAdministered}
-                    onCheckedChange={v => handleChange('contrastAdministered', v)}
+                    onCheckedChange={v => {
+                      handleChange('contrastAdministered', v);
+                      setTechniqueManuallyEdited(false); // Re-generate technique
+                    }}
                   />
                 </div>
               </CardHeader>
@@ -346,7 +464,10 @@ export default function ReportForm({ editId, onComplete, onCancel, templates }: 
                 <CardContent className="grid sm:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <Label>Contrast Agent</Label>
-                    <Input value={formData.contrastAgent} onChange={e => handleChange('contrastAgent', e.target.value)} placeholder="e.g., Gadoterate meglumine" />
+                    <Input value={formData.contrastAgent} onChange={e => {
+                      handleChange('contrastAgent', e.target.value);
+                      setTechniqueManuallyEdited(false);
+                    }} placeholder="e.g., Gadoterate meglumine" />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Volume</Label>
@@ -373,21 +494,50 @@ export default function ReportForm({ editId, onComplete, onCancel, templates }: 
                 <CardTitle className="text-sm">Report Content</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Quick Select Findings — for first (primary) study */}
                 <FindingCheckboxes
-                  bodyRegion={formData.bodyRegion}
+                  bodyRegion={studies[0]?.bodyRegion || 'Brain'}
                   onSelectionChange={handleFindingSelection}
                 />
+
+                {/* Technique — auto-filled with option to edit */}
                 <div className="space-y-1.5">
-                  <Label>Technique</Label>
-                  <Textarea value={formData.technique} onChange={e => handleChange('technique', e.target.value)} placeholder="Describe the MRI technique, sequences used..." rows={3} />
+                  <div className="flex items-center justify-between">
+                    <Label>Technique</Label>
+                    {techniqueManuallyEdited && (
+                      <button
+                        type="button"
+                        className="text-xs text-primary hover:underline"
+                        onClick={() => {
+                          setTechniqueManuallyEdited(false);
+                          setFormData(prev => ({ ...prev, technique: autoTechnique }));
+                        }}
+                      >
+                        Re-auto-generate
+                      </button>
+                    )}
+                  </div>
+                  <Textarea
+                    value={formData.technique}
+                    onChange={e => handleChange('technique', e.target.value)}
+                    placeholder="Auto-generated from study selection above..."
+                    rows={studies.length > 1 ? 6 : 3}
+                  />
+                  {!techniqueManuallyEdited && formData.technique && (
+                    <p className="text-[10px] text-muted-foreground">Auto-generated from study type selection. Edit to customize.</p>
+                  )}
                 </div>
+
                 <div className="space-y-1.5">
                   <Label>Comparison</Label>
                   <Textarea value={formData.comparison} onChange={e => handleChange('comparison', e.target.value)} placeholder="Comparison with prior studies..." rows={2} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="findings">Findings *</Label>
-                  <Textarea id="findings" value={formData.findings} onChange={e => handleChange('findings', e.target.value)} placeholder="Describe the MRI findings in detail..." rows={6} required />
+                  <Textarea id="findings" value={formData.findings} onChange={e => handleChange('findings', e.target.value)} placeholder={studies.length > 1 ? `Describe findings for each study separately...` : 'Describe the MRI findings in detail...'} rows={6} required />
+                  {studies.length > 1 && (
+                    <p className="text-[10px] text-muted-foreground">Tip: Separate findings by study, e.g., "BRAIN: ... CERVICAL SPINE: ..."</p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="impression">Impression *</Label>
