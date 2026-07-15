@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, stat } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+
+// Increase body size limit for large MRI file uploads
+export const maxDuration = 120;
 
 // Body region detection from filename
 function detectBodyRegion(filename: string): string {
@@ -38,7 +41,6 @@ function detectBodyRegion(filename: string): string {
 
 // Extract patient name attempt from filename
 function extractPatientHint(filename: string): string {
-  // Remove extension and common MRI terms
   const cleaned = filename
     .replace(/\.[^/.]+$/, '')
     .replace(/[_-]/g, ' ')
@@ -53,19 +55,45 @@ function extractPatientHint(filename: string): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
+    const baseDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'data', 'uploads');
+    const organizedDir = path.join(baseDir, 'organized');
+
+    // Ensure upload directories exist and are writable
+    try {
+      await mkdir(organizedDir, { recursive: true });
+      // Verify we can write to the directory
+      const testPath = path.join(organizedDir, '.write_test');
+      await writeFile(testPath, 'test');
+      await stat(testPath);
+      // Clean up test file
+      const { unlink } = await import('fs/promises');
+      await unlink(testPath).catch(() => {});
+    } catch (dirErr) {
+      console.error('[UPLOAD] Cannot write to upload directory:', organizedDir, dirErr);
+      return NextResponse.json(
+        { error: 'Upload directory not writable', details: `Path: ${organizedDir}` },
+        { status: 500 }
+      );
+    }
+
+    // Parse multipart form data
+    let formData;
+    try {
+      formData = await request.formData();
+    } catch (parseErr) {
+      console.error('[UPLOAD] Failed to parse form data:', parseErr);
+      return NextResponse.json(
+        { error: 'Failed to parse upload data. File may be too large.' },
+        { status: 413 }
+      );
+    }
+
     const files = formData.getAll('files') as File[];
     const folderStructure = (formData.get('folderStructure') as string) || '';
 
     if (files.length === 0) {
       return NextResponse.json({ error: 'No files provided' }, { status: 400 });
     }
-
-    const baseDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'data', 'uploads');
-    const organizedDir = path.join(baseDir, 'organized');
-
-    // Ensure upload directories exist
-    await mkdir(organizedDir, { recursive: true });
 
     const results = {
       total: files.length,
@@ -99,35 +127,31 @@ export async function POST(request: NextRequest) {
         const bytes = await file.arrayBuffer();
         await writeFile(storedPath, Buffer.from(bytes));
 
-        results.success++;
-        results.organized.push({
-          originalName: file.name,
-          storedPath: `organized/${bodyRegion}/${storedName}`,
-          bodyRegion,
-          patientName: patientHint,
-        });
+        // Verify file was written
+        const writtenStat = await stat(storedPath);
+        if (writtenStat.size === 0 && bytes.byteLength > 0) {
+          results.errors.push(`${file.name}: File written but 0 bytes`);
+        } else {
+          results.success++;
+          results.organized.push({
+            originalName: file.name,
+            storedPath: `organized/${bodyRegion}/${storedName}`,
+            bodyRegion,
+            patientName: patientHint,
+          });
+        }
       } catch (fileErr) {
         const msg = fileErr instanceof Error ? fileErr.message : String(fileErr);
+        console.error(`[UPLOAD] Failed to save ${file.name}:`, msg);
         results.errors.push(`${file.name}: ${msg}`);
       }
     }
 
-    // Also seed findings in the background
-    try {
-      const { db } = await import('@/lib/db');
-      const existing = await db.findingTemplate.findMany({ where: { isDefault: true } });
-      if (existing.length === 0) {
-        // Trigger seed
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${process.env.PORT || 3000}`;
-        fetch(`${baseUrl}/api/reports/seed-findings`, { method: 'POST' }).catch(() => {});
-      }
-    } catch {
-      // Non-critical
-    }
+    console.log(`[UPLOAD] ${results.success}/${results.total} files saved to ${organizedDir}`);
 
     return NextResponse.json({ results });
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error('[UPLOAD] Unexpected error:', error);
     return NextResponse.json(
       { error: 'Upload failed', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }

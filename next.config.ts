@@ -7,7 +7,6 @@ const nextConfig: NextConfig = {
   },
   reactStrictMode: false,
   turbopack: {},
-  // Allow up to 100MB for MRI report file uploads
   serverExternalPackages: [],
   experimental: {
     serverActions: {

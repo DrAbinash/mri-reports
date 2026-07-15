@@ -47,6 +47,7 @@ export default function FolderUpload() {
   const [folderName, setFolderName] = useState<string>('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResult, setLocalUploadResult] = useState<UploadResult | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -57,15 +58,9 @@ export default function FolderUpload() {
 
   const handleFiles = useCallback((files: FileList | File[], sourceFolder?: string) => {
     const fileList = Array.from(files);
-    // Filter common image/document formats for MRI reports
-    const validExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.dicom', '.dcm', '.nii', '.nii.gz', '.txt', '.doc', '.docx', '.rtf'];
-    
-    const validFiles = fileList.filter(f => {
-      const lowerName = f.name.toLowerCase();
-      return validExtensions.some(ext => lowerName.endsWith(ext)) || f.type.startsWith('image/') || f.type === 'application/pdf' || f.type === 'text/plain' || lowerName.endsWith('.dcm') || lowerName.endsWith('.dicom');
-    });
-
-    setSelectedFiles(validFiles);
+    // Accept ALL files — don't filter by extension (MRI files can have many formats)
+    // The server will handle organization regardless of extension
+    setSelectedFiles(fileList);
     setFolderName(sourceFolder || (fileList[0]?.name || 'Upload'));
     setLocalUploadResult(null);
     setUploadResult(null);
@@ -146,7 +141,16 @@ export default function FolderUpload() {
       });
 
       clearInterval(progressInterval);
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: `Server error ${res.status}` }));
+        setUploadError(errData.error || `Upload failed (${res.status})`);
+        setUploadProgress(0);
+        return;
+      }
+
       setUploadProgress(100);
+      setUploadError(null);
 
       const data = await res.json();
       if (data.results) {
@@ -155,6 +159,7 @@ export default function FolderUpload() {
       }
     } catch (err) {
       console.error('Upload error:', err);
+      setUploadError(err instanceof Error ? err.message : 'Network error — check your connection');
     } finally {
       setIsUploading(false);
     }
@@ -173,6 +178,7 @@ export default function FolderUpload() {
     setLocalUploadResult(null);
     setUploadResult(null);
     setUploadProgress(0);
+    setUploadError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (folderInputRef.current) folderInputRef.current.value = '';
   };
@@ -259,7 +265,6 @@ export default function FolderUpload() {
               className="hidden"
               onChange={handleFileInput}
               multiple
-              accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.tif,.dcm,.dicom,.txt,.doc,.docx,.rtf"
             />
           </motion.div>
         </CardContent>
@@ -325,6 +330,17 @@ export default function FolderUpload() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Upload Error */}
+      {uploadError && (
+        <Alert variant="destructive">
+          <XCircle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>{uploadError}</span>
+            <Button variant="ghost" size="sm" onClick={() => setUploadError(null)} className="shrink-0 ml-2">Dismiss</Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Upload Results */}
       <AnimatePresence>
