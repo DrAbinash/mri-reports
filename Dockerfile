@@ -4,9 +4,10 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install dependencies — npm ci uses package-lock.json for exact versions
-# This is critical for Synology: ensures reproducible builds on any architecture
+# --ignore-scripts skips postinstall hooks (prisma/sharp) to avoid npm 10.8+ allow-scripts gate
+# Prisma generate is run separately below
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # Copy Prisma schema and generate client BEFORE copying source
 # This ensures the correct engine binary for Alpine/musl is downloaded

@@ -69,4 +69,4 @@ tool-results/
 
 # Dev database
 /db/*.db
-/db/*.db-journal
+/db/*.db-journalupload/
