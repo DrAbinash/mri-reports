@@ -5,9 +5,10 @@
  * (level/laterality/severity) → FindingRow list → auto-compiled
  * impression (manual edits preserved until recompile).
  */
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { SmartTextarea } from "./SmartTextarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { SectionLabel, SeverityPill } from "./bits";
@@ -66,7 +67,7 @@ function severityOptionsFor(concept: string): string[] {
 }
 
 export function FindingsEditor({
-  report, order, findings, phrases, formats, images: initialImages, onMetaChange, onImagesChanged,
+  report, order, findings, phrases, formats, images: initialImages, onMetaChange, onImagesChanged, onProgress,
 }: {
   report: ReportCore;
   order: { bodyRegion: string; modality: string; testName: string | null; studyInstanceUid?: string | null };
@@ -76,6 +77,7 @@ export function FindingsEditor({
   images: KeyImage[];
   onMetaChange?: (meta: { studyName?: string | null }) => void;
   onImagesChanged?: () => void;
+  onProgress?: (p: { technique: string; impression: string; recommendation: string; opening: string; rows: Finding[] }) => void;
 }) {
   const [rows, setRows] = useState<Finding[]>(findings);
   const [technique, setTechnique] = useState(report.technique);
@@ -94,7 +96,42 @@ export function FindingsEditor({
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [rowDraft, setRowDraft] = useState("");
   const [dirty, setDirty] = useState(false);
+  const dirtyRef = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Latest free-text values for the immediate-flush event (hotkeys / patient switch).
+  const latest = useRef({ technique: report.technique, impression: report.impression, recommendation: report.recommendation, opening: report.findingsOpening ?? "" });
+  useEffect(() => {
+    latest.current = { technique, impression, recommendation, opening };
+  }, [technique, impression, recommendation, opening]);
+
+  const markDirty = () => {
+    dirtyRef.current = true;
+    setDirty(true);
+  };
+
+  /** Live progress for the quality gate / critical watch / draft snapshots. */
+  useEffect(() => {
+    onProgress?.({ technique, impression, recommendation, opening, rows });
+  }, [technique, impression, recommendation, opening, rows, onProgress]);
+
+  // Flush pending autosave immediately — fired by next/prev navigation & hotkeys.
+  useEffect(() => {
+    const flush = async () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (!dirtyRef.current) return;
+      dirtyRef.current = false;
+      const v = latest.current;
+      await fetch(`/api/reports/${report.id}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ technique: v.technique, impression: v.impression, recommendation: v.recommendation, findingsOpening: v.opening }),
+      });
+      setDirty(false);
+    };
+    window.addEventListener("care-studio:flush-save", flush);
+    return () => window.removeEventListener("care-studio:flush-save", flush);
+  }, [report.id]);
 
   // Server rows are the source of truth after every mutation; local list is
   // refreshed from mutation responses — never re-synced through effects.
@@ -283,9 +320,10 @@ export function FindingsEditor({
 
   // Debounced autosave for technique / impression / recommendation / opening
   const queueSave = () => {
-    setDirty(true);
+    markDirty();
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
+      dirtyRef.current = false;
       await fetch(`/api/reports/${report.id}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
@@ -379,12 +417,12 @@ export function FindingsEditor({
             <MicButton label="technique" onFinal={(chunk) => { const v = (technique ? technique.trimEnd() + " " : "") + chunk; setTechnique(v); queueSave(); }} />
           </div>
         </div>
-        <Textarea
+        <SmartTextarea
           value={technique}
-          onChange={(e) => { setTechnique(e.target.value); queueSave(); }}
+          onChange={(v) => { setTechnique(v); queueSave(); }}
           rows={2}
           className="border-border bg-card text-[13px] leading-relaxed"
-          placeholder="Sequences obtained…"
+          placeholder="Sequences obtained… (:trigger + Tab expands a snippet)"
         />
       </section>
 
@@ -421,9 +459,9 @@ export function FindingsEditor({
               <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary/70">Findings opening line</span>
               <span className="text-[9.5px] text-faint">— printed bold; the heading stays “{report.studyName || order.testName}”</span>
             </div>
-            <Textarea
+            <SmartTextarea
               value={opening}
-              onChange={(e) => { setOpening(e.target.value); queueSave(); }}
+              onChange={(v) => { setOpening(v); queueSave(); }}
               rows={2}
               data-testid="findings-opening"
               className="border-primary/25 bg-accent/40 text-[12.5px] font-semibold uppercase leading-relaxed tracking-wide text-foreground"
@@ -559,9 +597,9 @@ export function FindingsEditor({
                       ) : null}
                       {editingRow === row.id ? (
                         <div className="min-w-0 flex-1">
-                          <Textarea
+                          <SmartTextarea
                             value={rowDraft}
-                            onChange={(e) => setRowDraft(e.target.value)}
+                            onChange={setRowDraft}
                             rows={2}
                             autoFocus
                             className="border-border bg-card text-[12.5px]"
@@ -640,9 +678,9 @@ export function FindingsEditor({
             <span className="text-[10px] text-faint">auto-compiled from quoted findings</span>
           )}
         </div>
-        <Textarea
+        <SmartTextarea
           value={impression}
-          onChange={(e) => { setImpression(e.target.value); setManual(true); queueSave(); }}
+          onChange={(v) => { setImpression(v); setManual(true); queueSave(); }}
           rows={4}
           className="border-border bg-card text-[13px] leading-relaxed"
           placeholder="1. …"
@@ -658,12 +696,12 @@ export function FindingsEditor({
           <SectionLabel>Recommendation</SectionLabel>
           <MicButton label="recommendation" onFinal={(chunk) => { const v = (recommendation ? recommendation.trimEnd() + " " : "") + chunk; setRecommendation(v); queueSave(); }} />
         </div>
-        <Textarea
+        <SmartTextarea
           value={recommendation}
-          onChange={(e) => { setRecommendation(e.target.value); queueSave(); }}
+          onChange={(v) => { setRecommendation(v); queueSave(); }}
           rows={2}
           className="border-border bg-card text-[13px] leading-relaxed"
-          placeholder="Optional…"
+          placeholder="Optional… (:fu6 + Tab)"
         />
       </section>
 

@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SectionLabel } from "./bits";
 import { LOGIN_THEMES, type LoginThemeName } from "./LockScreen";
-import { Building2, UserRound, ShieldCheck, PlugZap, Check, X, Palette, Upload, Trash2, Waves, Download, ArchiveRestore } from "lucide-react";
+import { Building2, UserRound, ShieldCheck, PlugZap, Check, X, Palette, Upload, Trash2, Waves, Download, ArchiveRestore, Zap, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { readSnippets, saveCustomSnippets, type Snippet } from "@/lib/workspace-enhance";
 
 type Settings = {
   appTitle: string; hospitalName: string; addressLine: string; phone: string; email: string;
@@ -60,6 +61,16 @@ export function SettingsView() {
   const [restoring, setRestoring] = useState(false);
   /** Snapshot of the last SAVED state — used to warn before testing unsaved edits. */
   const savedRef = useRef<Settings | null>(null);
+  // Snippet macros (Productivity tab) — localStorage-backed, no server change.
+  const [snippets, setSnippets] = useState<Snippet[]>([]);
+  const [customSnippets, setCustomSnippets] = useState<Snippet[]>([]);
+  const [newSnip, setNewSnip] = useState({ trigger: "", text: "" });
+
+  useEffect(() => {
+    const all = readSnippets();
+    setSnippets(all);
+    setCustomSnippets(all.filter((s) => !s.builtin));
+  }, []);
 
   useEffect(() => {
     fetch("/api/settings").then((r) => r.json()).then((d) => {
@@ -226,6 +237,7 @@ export function SettingsView() {
           <TabsTrigger value="usg" className="text-[12px]"><Waves className="mr-1.5 h-3.5 w-3.5" />USG Studio</TabsTrigger>
           <TabsTrigger value="security" className="text-[12px]"><ShieldCheck className="mr-1.5 h-3.5 w-3.5" />Security</TabsTrigger>
           <TabsTrigger value="integrations" className="text-[12px]"><PlugZap className="mr-1.5 h-3.5 w-3.5" />Integrations</TabsTrigger>
+          <TabsTrigger value="productivity" className="text-[12px]"><Zap className="mr-1.5 h-3.5 w-3.5" />Productivity</TabsTrigger>
         </TabsList>
 
         <TabsContent value="appearance" className="mt-4 space-y-5 rounded-xl border border-border bg-card p-5">
@@ -559,6 +571,107 @@ export function SettingsView() {
           </div>
 
           <Button onClick={save} className="h-9 text-[12.5px]">Save integrations</Button>
+        </TabsContent>
+
+        <TabsContent value="productivity" className="mt-4 space-y-5 rounded-xl border border-border bg-card p-5">
+          <div>
+            <p className="text-[13px] font-bold">Snippet macros</p>
+            <p className="mt-0.5 text-[11.5px] leading-relaxed text-faint">
+              Type <b>:trigger</b> then <b>Tab</b> in any text box (technique, findings, impression, recommendation) to expand.
+              Use <b>$1</b> in the text as a placeholder — it gets selected for overtyping on expand.
+            </p>
+            <div className="mt-3 space-y-1.5">
+              {snippets.filter((sn) => sn.builtin).map((sn) => (
+                <div key={sn.trigger} className="flex items-center gap-3 rounded-lg border border-border bg-panel px-3 py-2">
+                  <kbd className="min-w-[64px] rounded border border-border bg-card px-1.5 py-0.5 text-center font-mono text-[11px] font-bold text-primary">:{sn.trigger}</kbd>
+                  <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">{sn.text}</span>
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-faint">built-in</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[13px] font-bold">Your snippets</p>
+            <p className="mt-0.5 text-[11.5px] text-faint">Custom expansions — saved on this workstation.</p>
+            <div className="mt-3 space-y-1.5">
+              {customSnippets.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-[12px] text-faint">
+                  No custom snippets yet — add one below.
+                </p>
+              ) : customSnippets.map((sn, i) => (
+                <div key={`${sn.trigger}-${i}`} className="flex items-center gap-2 rounded-lg border border-border bg-panel px-3 py-2">
+                  <kbd className="min-w-[64px] rounded border border-border bg-card px-1.5 py-0.5 text-center font-mono text-[11px] font-bold text-primary">:{sn.trigger}</kbd>
+                  <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">{sn.text}</span>
+                  <button
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-faint transition-colors hover:text-destructive"
+                    title="Delete snippet"
+                    onClick={() => {
+                      const next = customSnippets.filter((_, j) => j !== i);
+                      setCustomSnippets(next);
+                      saveCustomSnippets(next);
+                      setSnippets(readSnippets());
+                      toast.success("Snippet removed");
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <Input
+                value={newSnip.trigger}
+                onChange={(e) => setNewSnip({ ...newSnip, trigger: e.target.value.replace(/[^a-z0-9]/gi, "").toLowerCase() })}
+                placeholder="trigger (e.g. fuct)"
+                className="h-9 w-full font-mono text-[12px] sm:w-44"
+                maxLength={12}
+              />
+              <Input
+                value={newSnip.text}
+                onChange={(e) => setNewSnip({ ...newSnip, text: e.target.value })}
+                placeholder="Expansion text — $1 becomes a selected placeholder"
+                className="h-9 flex-1 text-[12px]"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newSnip.trigger && newSnip.text) {
+                    const next = [...customSnippets.filter((x) => x.trigger !== newSnip.trigger), { trigger: newSnip.trigger, text: newSnip.text }];
+                    setCustomSnippets(next);
+                    saveCustomSnippets(next);
+                    setSnippets(readSnippets());
+                    setNewSnip({ trigger: "", text: "" });
+                    toast.success(`Snippet :${newSnip.trigger} saved`);
+                  }
+                }}
+              />
+              <Button
+                size="sm"
+                className="h-9 shrink-0 gap-1 text-[12px]"
+                disabled={!newSnip.trigger || !newSnip.text}
+                onClick={() => {
+                  const next = [...customSnippets.filter((x) => x.trigger !== newSnip.trigger), { trigger: newSnip.trigger, text: newSnip.text }];
+                  setCustomSnippets(next);
+                  saveCustomSnippets(next);
+                  setSnippets(readSnippets());
+                  setNewSnip({ trigger: "", text: "" });
+                  toast.success(`Snippet :${newSnip.trigger} saved`);
+                }}
+              >
+                <Plus className="h-3.5 w-3.5" /> Add
+              </Button>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border bg-panel p-3.5">
+            <p className="text-[12px] font-bold">Also in this build</p>
+            <ul className="mt-1.5 space-y-1 text-[11.5px] leading-relaxed text-muted-foreground">
+              <li>• <b>Ctrl+K</b> — command palette (patients, views, actions)</li>
+              <li>• <b>Alt+↓ / Alt+↑</b> — next / previous patient while reporting</li>
+              <li>• <b>Read loop</b> — toggle in the reporting rail; auto-advances after finalize</li>
+              <li>• <b>Critical-finding interrupt</b> — SLA clock when critical language is detected</li>
+              <li>• <b>Draft snapshots</b> — crash-recovery banner restores lost text</li>
+              <li>• <b>20-20-20</b> — fatigue reminder every 20 minutes</li>
+            </ul>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

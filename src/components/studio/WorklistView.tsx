@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Search, RefreshCw, ChevronRight, Hourglass, ImageOff, CheckCircle2, Link2, EyeOff, ScanSearch } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { patientAccent } from "@/lib/workspace-enhance";
 
 function timeAgo(iso: string | null): string {
   if (!iso) return "—";
@@ -20,14 +21,17 @@ function timeAgo(iso: string | null): string {
 }
 
 function OrderRow({ order, onClick, action }: { order: Order; onClick?: () => void; action?: React.ReactNode }) {
+  const accent = patientAccent(order.patientName, order.patientMrn);
   return (
     <div
       className={cn(
-        "group flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 transition-all",
+        "group relative flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 transition-all",
         onClick && "cursor-pointer hover:border-primary/40 hover:shadow-[0_2px_12px_-4px_rgba(46,109,164,0.25)]",
       )}
       onClick={onClick}
     >
+      {/* Identity accent — same patient always paints the same colour */}
+      <span className="absolute inset-y-0 left-0 w-[3px] rounded-l" style={{ background: accent.band }} aria-hidden />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <ModalityChip modality={order.modality} />
@@ -84,7 +88,13 @@ export function WorklistView() {
   useEffect(() => {
     load();
     const t = setInterval(load, 5 * 60 * 1000); // 5-minute background sync
-    return () => clearInterval(t);
+    // The command palette fires this after its own sync.
+    const resync = () => load();
+    window.addEventListener("care-studio:resync-worklist", resync);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("care-studio:resync-worklist", resync);
+    };
   }, [load]);
 
   const sync = async () => {
