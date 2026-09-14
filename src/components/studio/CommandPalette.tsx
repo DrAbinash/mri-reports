@@ -7,7 +7,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useStudio, type View } from "@/lib/store";
 import type { Order } from "@/lib/store";
-import { patientAccent } from "@/lib/workspace-enhance";
+import { patientAccent, readSnippets, SNIPPET_INSERT_EVENT, snippetInsertAck } from "@/lib/workspace-enhance";
+import { toast } from "sonner";
 import {
   Search, CornerDownLeft, ArrowUp, ArrowDown, ListChecks, Waves, BookLock, Settings2,
   RefreshCw, LogOut, Printer, Stamp, Zap, ChevronRight,
@@ -16,7 +17,7 @@ import { cn } from "@/lib/utils";
 
 type Item = {
   id: string;
-  group: "Go to" | "Patients" | "Actions";
+  group: "Go to" | "Patients" | "Actions" | "Snippets";
   label: string;
   hint?: string;
   icon: React.ReactNode;
@@ -125,6 +126,30 @@ export function CommandPalette({ onPrint, onFinalize }: { onPrint?: () => void; 
   }, [orders, setView, openReporting, setSyncing, onPrint, onFinalize]);
 
   const filtered = useMemo(() => {
+    // ":" query → snippet insert mode (usg-style: search macros, click to insert).
+    if (q.startsWith(":")) {
+      const sq = q.slice(1).trim().toLowerCase();
+      return readSnippets()
+        .filter((s) =>
+          s.trigger.toLowerCase().includes(sq) ||
+          (s.label ?? "").toLowerCase().includes(sq) ||
+          s.text.toLowerCase().includes(sq) ||
+          (s.category ?? "").toLowerCase().includes(sq))
+        .slice(0, 14)
+        .map<Item>((s) => ({
+          id: `snip-${s.trigger}`, group: "Snippets", label: `:${s.trigger}`,
+          hint: s.label ?? s.category ?? "macro",
+          icon: <Zap className="h-3.5 w-3.5 text-amber-500" />, run: () => {
+            snippetInsertAck.ok = false;
+            window.dispatchEvent(new CustomEvent(SNIPPET_INSERT_EVENT, { detail: { text: s.text, trigger: s.trigger } }));
+            setTimeout(() => {
+              if (snippetInsertAck.ok) toast.success(`Inserted :${s.trigger} into the active text box`);
+              else toast.error("Click into a text box first, then insert the macro");
+              snippetInsertAck.ok = false;
+            }, 50);
+          },
+        }));
+    }
     if (!q.trim()) return items;
     return items
       .map((it) => ({ it, s: Math.max(score(q, it.label), score(q, it.hint ?? "") * 0.8) }))
@@ -173,7 +198,7 @@ export function CommandPalette({ onPrint, onFinalize }: { onPrint?: () => void; 
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={onInputKey}
-            placeholder="Search patients, views, actions…"
+            placeholder="Search patients, views, actions…  (type : for macros)"
             className="w-full bg-transparent text-[14px] outline-none placeholder:text-faint"
           />
           <kbd className="rounded border border-border bg-panel px-1.5 py-0.5 text-[10px] font-semibold text-faint">esc</kbd>

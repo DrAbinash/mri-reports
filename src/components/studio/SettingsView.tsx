@@ -1,6 +1,6 @@
 "use client";
 /** Settings — Appearance / Hospital / Radiologist / Security / Integrations. Secrets masked. */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,10 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SectionLabel } from "./bits";
 import { LOGIN_THEMES, type LoginThemeName } from "./LockScreen";
-import { Building2, UserRound, ShieldCheck, PlugZap, Check, X, Palette, Upload, Trash2, Waves, Download, ArchiveRestore, Zap, Plus } from "lucide-react";
+import { Building2, UserRound, ShieldCheck, PlugZap, Check, X, Palette, Upload, Trash2, Waves, Download, ArchiveRestore, Zap, Plus, Search, FileJson } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { readSnippets, saveCustomSnippets, type Snippet } from "@/lib/workspace-enhance";
+import { readSnippets, saveCustomSnippets, searchSnippets, normalizeImportedSnippets, SNIPPET_CATEGORIES, type Snippet } from "@/lib/workspace-enhance";
 
 type Settings = {
   appTitle: string; hospitalName: string; addressLine: string; phone: string; email: string;
@@ -65,6 +65,45 @@ export function SettingsView() {
   const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [customSnippets, setCustomSnippets] = useState<Snippet[]>([]);
   const [newSnip, setNewSnip] = useState({ trigger: "", text: "" });
+  const [snipQ, setSnipQ] = useState("");
+  const [snipCat, setSnipCat] = useState("all");
+  const snipImportRef = useRef<HTMLInputElement>(null);
+
+  // Snippet toolbar helpers — search + category filter over the merged library.
+  const filteredSnippets = useMemo(
+    () => searchSnippets(snipQ, snippets).filter((sn) =>
+      snipCat === "all" ? true : snipCat === "yours" ? !sn.builtin : sn.builtin && sn.category === snipCat),
+    [snippets, snipQ, snipCat],
+  );
+
+  const exportSnippets = () => {
+    const payload = { version: 1, exportedAt: new Date().toISOString(), snippets: customSnippets.map(({ trigger, text, label, category }) => ({ trigger, text, label, category })) };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "care-studio-snippets.json";
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(customSnippets.length ? `Exported ${customSnippets.length} snippet${customSnippets.length === 1 ? "" : "s"}` : "Nothing to export yet — your snippet file will be empty");
+  };
+
+  const importSnippetsFile = async (file: File) => {
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown;
+      const arr = Array.isArray(parsed) ? parsed : (parsed as { snippets?: unknown[] })?.snippets;
+      const norm = normalizeImportedSnippets(arr);
+      if (!norm.length) { toast.error("No valid snippets found in that file"); return; }
+      const by = new Map(customSnippets.map((s) => [s.trigger, s]));
+      for (const s of norm) by.set(s.trigger, { ...s, builtin: undefined });
+      const next = [...by.values()];
+      setCustomSnippets(next);
+      saveCustomSnippets(next);
+      setSnippets(readSnippets());
+      toast.success(`Imported ${norm.length} snippet${norm.length === 1 ? "" : "s"}${norm.some((s) => by.size && customSnippets.some((c) => c.trigger === s.trigger)) ? " (existing triggers updated)" : ""}`);
+    } catch {
+      toast.error("Could not read that file — expected JSON from the export button");
+    }
+  };
 
   useEffect(() => {
     const all = readSnippets();
@@ -575,25 +614,90 @@ export function SettingsView() {
 
         <TabsContent value="productivity" className="mt-4 space-y-5 rounded-xl border border-border bg-card p-5">
           <div>
-            <p className="text-[13px] font-bold">Snippet macros</p>
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-primary" />
+              <p className="text-[13px] font-bold">Snippet macros</p>
+              <span className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                {snippets.length} total · {customSnippets.length} yours
+              </span>
+            </div>
             <p className="mt-0.5 text-[11.5px] leading-relaxed text-faint">
-              Type <b>:trigger</b> then <b>Tab</b> in any text box (technique, findings, impression, recommendation) to expand.
-              Use <b>$1</b> in the text as a placeholder — it gets selected for overtyping on expand.
+              Type <b>:</b> in any text box (technique, findings, impression, recommendation) — matching macros pop up as you type.
+              Pick with <b>↑↓</b>, expand with <b>Tab</b> / <b>Enter</b>. <b>$1</b> in the text becomes a fill-in slot at the caret.
+              Also searchable from the command palette (<b>Ctrl+K</b>, type <b>:</b>) and the <b>?</b> cheat sheet.
             </p>
+
+            {/* Search + import/export */}
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" />
+                <Input
+                  value={snipQ}
+                  onChange={(e) => setSnipQ(e.target.value)}
+                  placeholder="Search macros — trigger, label, text, category…"
+                  className="h-9 pl-8 text-[12px]"
+                />
+              </div>
+              <Button size="sm" variant="outline" className="h-9 shrink-0 gap-1 text-[12px]" onClick={exportSnippets}>
+                <Download className="h-3.5 w-3.5" /> Export
+              </Button>
+              <Button size="sm" variant="outline" className="h-9 shrink-0 gap-1 text-[12px]" onClick={() => snipImportRef.current?.click()}>
+                <Upload className="h-3.5 w-3.5" /> Import
+              </Button>
+              <input
+                ref={snipImportRef}
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void importSnippetsFile(f);
+                  e.target.value = ""; // allow re-selecting the same file
+                }}
+              />
+            </div>
+
+            {/* Category chips */}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {["all", ...SNIPPET_CATEGORIES, "yours"].map((c) => {
+                const n = c === "all" ? snippets.length : c === "yours" ? customSnippets.length : snippets.filter((sn) => sn.builtin && sn.category === c).length;
+                if (n === 0) return null;
+                return (
+                  <button
+                    key={c}
+                    onClick={() => setSnipCat(c)}
+                    className={cn(
+                      "rounded-full border px-2 py-0.5 text-[10.5px] font-semibold transition-colors",
+                      snipCat === c ? "border-primary bg-primary text-primary-foreground" : "border-border bg-panel text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {c === "all" ? "All" : c === "yours" ? "Your snippets" : c} · {n}
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="mt-3 space-y-1.5">
-              {snippets.filter((sn) => sn.builtin).map((sn) => (
-                <div key={sn.trigger} className="flex items-center gap-3 rounded-lg border border-border bg-panel px-3 py-2">
+              {filteredSnippets.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-[12px] text-faint">
+                  No macros match — clear the search or add your own below.
+                </p>
+              ) : filteredSnippets.map((sn) => (
+                <div key={sn.trigger} className="flex items-center gap-3 rounded-lg border border-border bg-panel px-3 py-2" title={sn.text}>
                   <kbd className="min-w-[64px] rounded border border-border bg-card px-1.5 py-0.5 text-center font-mono text-[11px] font-bold text-primary">:{sn.trigger}</kbd>
-                  <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">{sn.text}</span>
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-faint">built-in</span>
+                  <div className="min-w-0 flex-1">
+                    {sn.label ? <p className="truncate text-[12px] font-semibold">{sn.label}</p> : null}
+                    <p className="truncate text-[11.5px] text-muted-foreground">{sn.text}</p>
+                  </div>
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-faint">{sn.builtin ? (sn.category ?? "built-in") : "yours"}</span>
                 </div>
               ))}
             </div>
           </div>
 
           <div>
-            <p className="text-[13px] font-bold">Your snippets</p>
-            <p className="mt-0.5 text-[11.5px] text-faint">Custom expansions — saved on this workstation.</p>
+            <p className="text-[13px] font-bold">Add or remove your snippets</p>
+            <p className="mt-0.5 text-[11.5px] text-faint">Custom expansions — saved on this workstation, exportable to your other machines via the buttons above.</p>
             <div className="mt-3 space-y-1.5">
               {customSnippets.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-[12px] text-faint">

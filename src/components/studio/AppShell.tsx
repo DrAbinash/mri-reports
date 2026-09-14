@@ -1,6 +1,6 @@
 "use client";
 /** App shell: slim header + left nav + main region. Single-screen studio. */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStudio } from "@/lib/store";
 import { WorklistView } from "./WorklistView";
 import { ReportingView } from "./ReportingView";
@@ -9,11 +9,11 @@ import { SettingsView } from "./SettingsView";
 import { UsgStudioView } from "./usg/UsgStudioView";
 import { CommandPalette } from "./CommandPalette";
 import { FatigueTimer } from "./FatigueTimer";
-import { Stethoscope, ListChecks, BookLock, Settings2, LogOut, RefreshCw, Waves, Command, Keyboard, X } from "lucide-react";
+import { Stethoscope, ListChecks, BookLock, Settings2, LogOut, RefreshCw, Waves, Command, Keyboard, X, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { patientAccent, readLoopEnabled, setReadLoopEnabled } from "@/lib/workspace-enhance";
+import { patientAccent, readLoopEnabled, setReadLoopEnabled, readSnippets, SNIPPET_CATEGORIES, type Snippet } from "@/lib/workspace-enhance";
 import type { View } from "@/lib/store";
 
 const NAV: { id: View; label: string; icon: typeof ListChecks; tint: string }[] = [
@@ -30,7 +30,7 @@ const SHORTCUTS: [string, string][] = [
   ["Ctrl + P", "Preview & print the open report"],
   ["Ctrl + Enter", "Finalize & bill the open report"],
   ["Ctrl + S", "Save the draft now"],
-  [":trigger + Tab", "Expand a snippet macro in any text box"],
+  [": + letters", "Snippet autocomplete in any text box — ↑↓ then Tab to expand"],
   ["?", "Show / hide this cheat sheet"],
 ];
 
@@ -38,6 +38,10 @@ export function AppShell() {
   const { view, setView, activeOrderId, orders, syncedAt, careOk, orthancOk, syncing, lastError } = useStudio();
   const router = useRouter();
   const [showKeys, setShowKeys] = useState(false);
+  const [cheatCat, setCheatCat] = useState<string>("all");
+
+  // Snippet library for the cheat sheet — read fresh each time it opens (localStorage, cheap).
+  const cheatSnippets = useMemo<Snippet[]>(() => (showKeys ? readSnippets() : []), [showKeys]);
 
   const toReport = orders.filter((o) => (o.status === "TO_REPORT" || o.status === "REPORTING") && !o.ignored).length;
 
@@ -210,7 +214,7 @@ export function AppShell() {
       {/* Shortcuts cheat sheet */}
       {showKeys ? (
         <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/40 px-4 backdrop-blur-[2px]" onClick={() => setShowKeys(false)}>
-          <div className="w-full max-w-md rounded-xl border border-border bg-card p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="studio-scroll max-h-[86vh] w-full max-w-lg overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Keyboard className="h-4 w-4 text-primary" />
@@ -228,9 +232,53 @@ export function AppShell() {
                 </div>
               ))}
             </div>
+
+            {/* Text expansion — usg-style grouped snippet browser */}
+            <div className="mt-4 border-t border-border pt-3">
+              <div className="mb-2 flex items-center gap-2">
+                <Zap className="h-4 w-4 text-primary" />
+                <span className="text-[14px] font-bold">Text expansion</span>
+                <span className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                  {cheatSnippets.length} macros
+                </span>
+              </div>
+              <p className="mb-2 text-[11.5px] leading-relaxed text-muted-foreground">
+                Type <b>:fu</b> in any text box — matching macros appear as you type.
+                Pick with <b>↑↓</b>, expand with <b>Tab</b>.
+              </p>
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {["all", ...SNIPPET_CATEGORIES, "Custom"].map((c) => {
+                  const n = c === "all" ? cheatSnippets.length : cheatSnippets.filter((s) => (c === "Custom" ? !s.builtin : s.category === c)).length;
+                  if (n === 0) return null;
+                  return (
+                    <button
+                      key={c}
+                      onClick={() => setCheatCat(c)}
+                      className={cn(
+                        "rounded-full border px-2 py-0.5 text-[10.5px] font-semibold transition-colors",
+                        cheatCat === c ? "border-primary bg-primary text-primary-foreground" : "border-border bg-panel text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {c === "all" ? "All" : c} · {n}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="studio-scroll max-h-[38vh] space-y-0.5 overflow-y-auto pr-1">
+                {cheatSnippets
+                  .filter((s) => cheatCat === "all" ? true : cheatCat === "Custom" ? !s.builtin : s.category === cheatCat)
+                  .map((s) => (
+                    <div key={s.trigger} className="flex items-center gap-2.5 rounded-lg px-2 py-1 hover:bg-accent" title={s.text}>
+                      <kbd className="min-w-[76px] shrink-0 rounded-md border border-border bg-panel px-1.5 py-0.5 text-center font-mono text-[10.5px] font-bold text-primary">:{s.trigger}</kbd>
+                      <span className="min-w-0 flex-1 truncate text-[12px]">{s.label ?? s.text}</span>
+                      {s.category ? <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">{s.builtin ? s.category : "yours"}</span> : null}
+                    </div>
+                  ))}
+              </div>
+            </div>
+
             <p className="mt-3 rounded-md bg-accent px-2.5 py-2 text-[10.5px] leading-relaxed text-muted-foreground">
-              Snippet macros: type <b>:fu6</b> then <b>Tab</b> in any text box to expand “Follow-up ultrasound after 6 weeks is advised.”.
-              Manage snippets in Settings → Productivity.
+              Manage and add your own macros in <b>Settings → Productivity</b>. Import / export them as JSON from there too.
             </p>
           </div>
         </div>

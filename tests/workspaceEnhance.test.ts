@@ -4,7 +4,8 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  patientAccent, scanCritical, qualityGate, expandSnippet, formatElapsed, readSnippets,
+  patientAccent, scanCritical, qualityGate, expandSnippet, expandSelectedSnippet, formatElapsed, readSnippets,
+  matchPartialSnippets, searchSnippets, normalizeImportedSnippets, SNIPPET_CATEGORIES,
 } from "@/lib/workspace-enhance";
 
 describe("patientAccent", () => {
@@ -131,6 +132,152 @@ describe("snippet macros", () => {
 
   it("returns null for unknown triggers", () => {
     expect(expandSnippet(":zzz", 4, snippets)).toBeNull();
+  });
+});
+
+describe("snippet library v2 (categories, autocomplete, import)", () => {
+  const snippets = readSnippets();
+
+  it("gives every built-in a category and a label", () => {
+    for (const s of snippets.filter((x) => x.builtin)) {
+      expect(s.category, `:${s.trigger}`).toBeTruthy();
+      expect(s.label, `:${s.trigger}`).toBeTruthy();
+    }
+  });
+
+  it("uses only known categories", () => {
+    const cats = new Set(snippets.filter((s) => s.builtin).map((s) => s.category));
+    for (const c of cats) expect(SNIPPET_CATEGORIES).toContain(c);
+  });
+
+  it("has no duplicate triggers", () => {
+    const triggers = snippets.map((s) => s.trigger);
+    expect(triggers.length).toBe(new Set(triggers).size);
+  });
+
+  it("covers every category with several macros", () => {
+    for (const c of SNIPPET_CATEGORIES) {
+      expect(snippets.filter((s) => s.category === c).length).toBeGreaterThanOrEqual(5);
+    }
+  });
+
+  it("includes the new modality macros", () => {
+    const t = new Set(snippets.map((s) => s.trigger));
+    for (const want of ["stroke", "glio", "mets", "bulge", "steno", "acl", "rotator", "fatty", "appendic", "ggo", "fx", "colles", "cpfree", "clear"]) {
+      expect(t.has(want), `:${want}`).toBe(true);
+    }
+  });
+
+  it("expands the new brain macro with a $1 slot", () => {
+    const hit = expandSnippet(":stroke", 7, snippets);
+    expect(hit!.value).toContain("restricted diffusion on DWI");
+    expect(hit!.value).not.toContain("$1");
+    expect(hit!.select).toBeTruthy();
+  });
+
+  it("expands the verbatim spine macro", () => {
+    const hit = expandSnippet("Findings: :loss", 15, snippets);
+    expect(hit!.value).toBe("Findings: Evidence of loss of cervical lordosis — ? due to muscle spasm.");
+  });
+
+  it("expands the verbatim chest normal macro", () => {
+    const hit = expandSnippet(":cpfree", 7, snippets);
+    expect(hit!.value).toBe("Bilateral costo-phrenic and cardio-phrenic angles are free.");
+  });
+});
+
+describe("matchPartialSnippets (autocomplete)", () => {
+  const snippets = readSnippets();
+
+  it("ranks prefix hits first", () => {
+    const got = matchPartialSnippets("fu", snippets, 5).map((s) => s.trigger);
+    expect(got[0]).toBe("fu6"); // exact prefix before longer prefixes
+    expect(got.length).toBeLessThanOrEqual(5);
+  });
+
+  it("matches on label and text, not just trigger", () => {
+    const got = matchPartialSnippets("hydrocephalus", snippets, 10).map((s) => s.trigger);
+    expect(got).toContain("nph"); // matched via its label
+  });
+
+  it("matches on category", () => {
+    const got = matchPartialSnippets("brain", snippets, 50);
+    expect(got.length).toBeGreaterThan(0);
+    expect(got.some((s) => s.category === "MRI Brain")).toBe(true);
+  });
+
+  it("empty partial returns the head of the library", () => {
+    const got = matchPartialSnippets("", snippets, 3);
+    expect(got.length).toBe(3);
+  });
+
+  it("respects the limit", () => {
+    expect(matchPartialSnippets("", snippets, 2).length).toBe(2);
+  });
+});
+
+describe("searchSnippets (settings search)", () => {
+  const snippets = readSnippets();
+
+  it("finds by trigger substring", () => {
+    expect(searchSnippets("stroke", snippets).map((s) => s.trigger)).toContain("stroke");
+  });
+
+  it("finds by category, case-insensitively", () => {
+    const got = searchSnippets("x-ray", snippets);
+    expect(got.length).toBeGreaterThan(0);
+    expect(got.every((s) => s.category === "X-ray")).toBe(true);
+  });
+
+  it("finds by free text inside the expansion", () => {
+    const got = searchSnippets("costo-phrenic", snippets);
+    expect(got.map((s) => s.trigger)).toContain("cpfree");
+  });
+
+  it("empty query returns everything", () => {
+    expect(searchSnippets("", snippets).length).toBe(snippets.length);
+  });
+});
+
+describe("expandSelectedSnippet (autocomplete selection)", () => {
+  const snippets = readSnippets();
+  const mets = snippets.find((s) => s.trigger === "mets")!;
+
+  it("replaces a partially-typed trigger", () => {
+    const hit = expandSelectedSnippet("Impression: :me", 15, mets, "me");
+    expect(hit!.value.startsWith("Impression: Multiple space-occupying lesions")).toBe(true);
+    expect(hit!.value).not.toContain(":me");
+  });
+
+  it("returns null when the text before the caret disagrees", () => {
+    expect(expandSelectedSnippet("plain text", 10, mets, "me")).toBeNull();
+  });
+});
+
+describe("normalizeImportedSnippets (import)", () => {
+  it("accepts a plain array and cleans triggers", () => {
+    const got = normalizeImportedSnippets([{ trigger: "My-Snip!", text: "  Hello.  " }, { trigger: "ok2", text: "Fine." }]);
+    expect(got).toHaveLength(2);
+    expect(got[0].trigger).toBe("mysnip");
+    expect(got[0].text).toBe("Hello.");
+    expect(got[1].category).toBe("Custom");
+  });
+
+  it("keeps label and category when given", () => {
+    const got = normalizeImportedSnippets([{ trigger: "k", text: "v", label: "Kidney", category: "CT" }]);
+    expect(got[0].label).toBe("Kidney");
+    expect(got[0].category).toBe("CT");
+  });
+
+  it("drops junk and duplicates", () => {
+    const got = normalizeImportedSnippets([null, 42, { trigger: "", text: "x" }, { trigger: "a", text: "1" }, { trigger: "a", text: "2" }, "nope"]);
+    expect(got).toHaveLength(1);
+    expect(got[0].text).toBe("1");
+  });
+
+  it("rejects non-arrays", () => {
+    expect(normalizeImportedSnippets({})).toHaveLength(0);
+    expect(normalizeImportedSnippets(undefined)).toHaveLength(0);
   });
 });
 
