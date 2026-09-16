@@ -22,6 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Printer, Save, Stamp, ArrowLeft, FileText, ChevronUp, ChevronDown, Zap, History, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { batchSort } from "@/lib/batch-sort";
 import {
   patientAccent, qualityGate, readLoopEnabled, setReadLoopEnabled,
   saveDraftSnapshot, listDraftSnapshots, clearDraftSnapshots, prefetchReportBundle,
@@ -120,7 +121,7 @@ export function ReportingView() {
 
   // To-report queue + neighbours (for next/prev + read loop + prefetch)
   const queue = useMemo(
-    () => orders.filter((o) => (o.status === "TO_REPORT" || o.status === "REPORTING") && !o.ignored && !o.accessionNumber.startsWith("ORTH-")),
+    () => batchSort(orders.filter((o) => (o.status === "TO_REPORT" || o.status === "REPORTING") && !o.ignored && !o.accessionNumber.startsWith("ORTH-"))),
     [orders],
   );
   const qIndex = queue.findIndex((o) => o.id === activeOrderId);

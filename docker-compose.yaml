@@ -1,0 +1,39 @@
+services:
+  studio:
+    build: .
+    container_name: care-reporting-studio
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/db/studio.db?socket_timeout=60000&connection_limit=1
+      - TZ=${TZ:-Asia/Kolkata}
+      - CARE_API_BASE=${CARE_API_BASE:-}
+      - CARE_API_KEY=${CARE_API_KEY:-}
+      - ORTHANC_URL=${ORTHANC_URL:-}
+      - ORTHANC_USERNAME=${ORTHANC_USERNAME:-}
+      - ORTHANC_PASSWORD=${ORTHANC_PASSWORD:-}
+      - OHIF_LAN_URL=${OHIF_LAN_URL:-}
+      - OHIF_TAILSCALE_URL=${OHIF_TAILSCALE_URL:-}
+      - INTEGRATION_DEFAULTS=${INTEGRATION_DEFAULTS:-on}
+      - OLLAMA_URL=${OLLAMA_URL:-}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-}
+      - OLLAMA_VISION_MODEL=${OLLAMA_VISION_MODEL:-}
+      - OLLAMA_NUM_CTX=${OLLAMA_NUM_CTX:-}
+      - QWEN_API_KEY=${QWEN_API_KEY:-}
+      - QWEN_BASE_URL=${QWEN_BASE_URL:-}
+      - QWEN_MODEL=${QWEN_MODEL:-}
+      - QWEN_VISION_MODEL=${QWEN_VISION_MODEL:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-}
+      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-}
+    volumes:
+      - ./data/db:/app/data/db
+      - /volume1/backup/care-studio-data:/app/data/backup-snapshot:ro
+    ports:
+      - "${STUDIO_PORT:-3090}:3000"
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+        reservations:
+          memory: 192M

@@ -74,8 +74,14 @@ export type CareWorklistItem = {
   billingStatus?: string | null;
 };
 
-export function fetchWorklist() {
-  return careFetch<CareWorklistItem[]>("/api/internal/reporting-studio/worklist?status=pending");
+export async function fetchWorklist() {
+  const r = await careFetch<CareWorklistItem[]>("/api/internal/reporting-studio/worklist");
+  if (!r.ok) return r;
+  const normalized = r.data.map((it) => ({
+    ...it,
+    accessionNumber: it.accessionNumber && it.accessionNumber.trim() ? it.accessionNumber : `CARE-${it.worklistId}`,
+  })).map((it) => (it as any).status === "STUDY_RECEIVED" ? { ...it, status: "TO_REPORT" } : it);
+  return { ok: true as const, data: normalized };
 }
 
 export type FinalizePayload = {

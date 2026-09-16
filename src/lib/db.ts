@@ -11,3 +11,6 @@ export const db =
   })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
+db.$executeRawUnsafe("PRAGMA journal_mode=WAL;").catch(() => {});
+db.$executeRawUnsafe("PRAGMA synchronous=NORMAL;").catch(() => {});
+db.$executeRawUnsafe("PRAGMA busy_timeout=30000;").catch(() => {});

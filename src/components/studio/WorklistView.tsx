@@ -20,6 +20,7 @@ function timeAgo(iso: string | null): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+function modGroup(m: string): string { const u = (m || "").toUpperCase(); if (u.startsWith("MR")) return "MRI"; if (u.startsWith("CT")) return "CT"; if (u.includes("US") || u.includes("DOPPLER") || u.includes("ECHO")) return "USG"; if (u.startsWith("X") || u.includes("RAY")) return "X-Ray"; return u || "OTHER"; }
 function OrderRow({ order, onClick, action }: { order: Order; onClick?: () => void; action?: React.ReactNode }) {
   const accent = patientAccent(order.patientName, order.patientMrn);
   return (
@@ -73,6 +74,9 @@ function Bucket({ icon, title, hint, tone, children }: {
 
 export function WorklistView() {
   const { orders, setWorklist, syncing, setSyncing, openReporting, search, setSearch } = useStudio();
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+  const [modFilter, setModFilter] = useState<string>("MRI");
   const [matchOrder, setMatchOrder] = useState<Order | null>(null);
   const [matchValue, setMatchValue] = useState("");
 
@@ -111,7 +115,7 @@ export function WorklistView() {
       }
       await load();
     } else {
-      toast.error("Sync failed");
+      toast.error("Sync failed"); setSyncing(false);
     }
   };
 
@@ -165,18 +169,20 @@ export function WorklistView() {
         (o.testName ?? "").toLowerCase().includes(q),
     );
   }, [orders, search]);
+  const dated = useMemo(() => shown.filter((o) => { const d = String((o as any).studyDate || (o as any).createdAt || ""); const day = d.slice(0, 10); if (!dateFrom && !dateTo) return true; if (!day) return false; if (dateFrom && day < dateFrom) return false; if (dateTo && day > dateTo) return false; return true; }), [shown, dateFrom, dateTo]);
+  const filtered = useMemo(() => dated.filter((o) => modFilter === "ALL" || modGroup(String((o as any).modality || "")) === modFilter), [dated, modFilter]);
 
   // Drafts in progress (REPORTING) stay visible in "To report" — a case
   // must never vanish from the worklist just because it was opened.
-  const toReport = shown.filter(
+  const toReport = filtered.filter(
     (o) => (o.status === "TO_REPORT" || o.status === "REPORTING") && !o.ignored && !o.accessionNumber.startsWith("ORTH-"),
   );
-  const awaiting = shown.filter((o) => o.status === "AWAITING_IMAGES" && !o.ignored);
-  const unlinked = shown.filter((o) => o.status === "TO_REPORT" && o.accessionNumber.startsWith("ORTH-") && !o.ignored);
-  const reportedToday = shown.filter(
+  const awaiting = filtered.filter((o) => o.status === "AWAITING_IMAGES" && !o.ignored);
+  const unlinked = filtered.filter((o) => o.status === "TO_REPORT" && o.accessionNumber.startsWith("ORTH-") && !o.ignored);
+  const reportedToday = filtered.filter(
     (o) => o.status === "REPORTED" && o.studyDate && Date.now() - new Date(o.studyDate).getTime() < 36 * 3600 * 1000,
   );
-  const reportedPast = shown.filter(
+  const reportedPast = filtered.filter(
     (o) => o.status === "REPORTED" && !(o.studyDate && Date.now() - new Date(o.studyDate).getTime() < 36 * 3600 * 1000),
   );
 
@@ -202,6 +208,8 @@ export function WorklistView() {
           <RefreshCw className={cn("mr-2 h-3.5 w-3.5", syncing && "animate-spin")} />
           {syncing ? "Syncing…" : "Sync now"}
         </Button>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5"><Button size="sm" variant="outline" onClick={() => { const t = new Date().toISOString().slice(0, 10); setDateFrom(t); setDateTo(t); }}>Today</Button><Button size="sm" variant="outline" onClick={() => { const y = new Date(Date.now() - 86400000).toISOString().slice(0, 10); setDateFrom(y); setDateTo(y); }}>Yesterday</Button><Button size="sm" variant="outline" onClick={() => { setDateFrom(new Date(Date.now() - 604800000).toISOString().slice(0, 10)); setDateTo(new Date().toISOString().slice(0, 10)); }}>Last 7d</Button><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 rounded-md border border-input bg-card px-2 text-xs" /><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 rounded-md border border-input bg-card px-2 text-xs" />{(dateFrom || dateTo) && <Button size="sm" variant="ghost" onClick={() => { setDateFrom(""); setDateTo(""); }}>Clear</Button>}</div>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">{["MRI", "CT", "USG", "X-Ray", "ALL"].map((g) => (<Button key={g} size="sm" variant={modFilter === g ? "default" : "outline"} onClick={() => setModFilter(g)}>{g}</Button>))}</div>
       </div>
 
       {/* To Report */}

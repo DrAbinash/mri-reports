@@ -18,6 +18,8 @@ import { KeyImages, type KeyImage } from "./KeyImages";
 import { Plus, Trash2, Quote, StickyNote, Pencil, WandSparkles, Check, Zap, LayoutTemplate, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { normalizeMedicalText } from "@/lib/voice-engine";
+import AIAssistPanel from "@/components/studio/AIAssistPanel";
 
 export type Phrase = {
   id: string; region: string; modality: string; label: string;
@@ -350,6 +352,7 @@ export function FindingsEditor({
 
   return (
     <div className="space-y-5">
+      <AIAssistPanel studyId={order.studyInstanceUid ?? undefined} modality={order.modality} bodyPart={order.bodyRegion} clinicalInfo={order.testName ?? undefined} currentFindings={findings.map(r => r.text).join(" ")} mrn={(order as any).patientMrn ?? undefined} accession={(order as any).accessionNumber ?? undefined} patientName={(order as any).patientName ?? undefined} onInsertTechnique={(t) => setTechnique(t)} onSetImpression={(t) => setImpression(t)} onAppendImpression={(t) => setImpression(impression ? impression + "\n" + t : t)} />
       {/* Report format — one click fills the whole report */}
       {formats.length > 0 ? (
         <section className="rounded-xl border border-primary/25 bg-panel/70 p-3.5 shadow-sm">
@@ -446,7 +449,7 @@ export function FindingsEditor({
 
         {dictating ? (
           <DictationBar
-            onFinalText={addDictated}
+            onFinalText={(t) => addDictated(normalizeMedicalText(t))}
             onCancel={() => setDictating(false)}
           />
         ) : null}

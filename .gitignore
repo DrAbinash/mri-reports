@@ -1,47 +1,46 @@
-# dependencies
-node_modules
-/.pnp
-.pnp.*
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
 
-# testing
-/coverage
+# Testing
+coverage/
 
-# next.js
-/.next/
-/out/
+# Next.js
+.next/
+out/
 
-# production
-/build
+# Production
+build/
+dist/
 
-# misc
+# Misc
 .DS_Store
 *.pem
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# debug
+# Debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-dev.log
-*.log
 
-# env files
-.env
-.env*.local
+# Synology metadata
+@eaDir/
+*/@eaDir/
+**/@eaDir/
 
-# vercel
-.vercel
+# Backup and conflict files
+*.bak
+*Conflict*
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# Data directories (SQLite, backups)
+data/
+upload/
 
-# Studio — local database & deploy state
-/db/
-/data/
-
-# local test database
-prisma/dev.db
-prisma/dev.db-journal
-
-# vitest scratch databases
-tests/.tmp
+# IDE
+.vscode/
+.idea/
