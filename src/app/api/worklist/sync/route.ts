@@ -4,6 +4,14 @@ import { getSettings } from "@/lib/settings";
 import { fetchBillingStatus, fetchWorklist, finalizeReport } from "@/lib/careClient";
 import { listStudies } from "@/lib/orthancClient";
 
+/** v6.16 — Age plausibility guard: reject ERP garbage (e.g. 126). 0-110 only. */
+function saneAge(raw: string | null | undefined): string | null {
+  if (raw == null) return null;
+  const n = Number(String(raw).replace(/[^0-9]/g, ""));
+  return Number.isFinite(n) && n > 0 && n <= 110 ? String(n) : null;
+}
+
+
 /** Retry one pending finalize; returns true when CARE accepted it. */
 async function finalizeReportPayload(p: { order: { accessionNumber: string; careWorklistId: string | null }; technique: string; findings: string; impression: string; recommendation: string }): Promise<boolean> {
   const s = await getSettings();
@@ -114,6 +122,7 @@ export async function POST() {
               where: { id: existing.id },
               data: {
                 patientName: w.patientName ?? existing.patientName,
+                patientAge: saneAge(w.patientAge) ?? existing.patientAge,
                 referringDoctor: w.referringDoctor ?? existing.referringDoctor,
                 testName: w.testName ?? existing.testName,
                 billingStatus: w.billingStatus ?? existing.billingStatus,
@@ -128,7 +137,7 @@ export async function POST() {
               accessionNumber: w.accessionNumber,
               careWorklistId: w.worklistId,
               patientName: w.patientName,
-              patientAge: w.patientAge ?? null,
+              patientAge: saneAge(w.patientAge),
               patientGender: w.patientGender ?? null,
               referringDoctor: w.referringDoctor ?? null,
               testName: w.testName ?? null,
