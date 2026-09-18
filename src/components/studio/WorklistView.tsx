@@ -184,14 +184,14 @@ export function WorklistView() {
 
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return orders;
+    if (!q) return filteredOrders;
     return filteredOrders.filter(
       (o) =>
         o.patientName.toLowerCase().includes(q) ||
         o.accessionNumber.toLowerCase().includes(q) ||
         (o.testName ?? "").toLowerCase().includes(q),
     );
-  }, [orders, search]);
+  }, [filteredOrders, search]);
 
   // Drafts in progress (REPORTING) stay visible in "To report" — a case
   // must never vanish from the worklist just because it was opened.

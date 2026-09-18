@@ -141,7 +141,16 @@ export async function POST() {
               patientGender: w.patientGender ?? null,
               referringDoctor: w.referringDoctor ?? null,
               testName: w.testName ?? null,
-              modality: (["CT", "USG", "X-Ray"].includes(w.modality ?? "") ? w.modality : "MR") as string,
+              modality: ((): string => {
+                const raw = (w.modality ?? "").trim().toUpperCase();
+                if (raw === "CT" || raw === "USG") return raw;
+                if (raw === "X-RAY" || raw === "XRAY") return "X-Ray";
+                const tn = w.testName ?? "";
+                if (/usg|ultrasound|sonograph|doppler|antenatal|obstetric|tvs|trus/i.test(tn)) return "USG";
+                if (/x-?ray/i.test(tn)) return "X-Ray";
+                if (/\bct\b/i.test(tn)) return "CT";
+                return "MR";
+              })(),
               bodyRegion: guessRegion(w.testName ?? "", (["CT", "USG", "X-Ray"].includes(w.modality ?? "") ? w.modality : "MR") as string),
               studyInstanceUid: w.studyInstanceUid ?? null,
               billingStatus: w.billingStatus ?? null,
